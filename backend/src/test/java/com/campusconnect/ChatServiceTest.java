@@ -4,6 +4,7 @@ import com.campusconnect.entity.Conversation;
 import com.campusconnect.entity.ConversationParticipant;
 import com.campusconnect.entity.Message;
 import com.campusconnect.entity.User;
+import com.campusconnect.dto.ChatUserDto;
 import com.campusconnect.dto.ConversationSummaryDto;
 import com.campusconnect.dto.CreateConversationRequest;
 import com.campusconnect.dto.MessageDto;
@@ -177,6 +178,26 @@ class ChatServiceTest {
         // convOld should be first because its message is newer
         assertThat(result.get(0).id()).isEqualTo(1L);
         assertThat(result.get(1).id()).isEqualTo(2L);
+    }
+
+    @Test
+    void searchUsers_returnsEmptyWhenQueryIsBlank() {
+        List<ChatUserDto> results = conversationService.searchUsers("alice@test.com", "   ");
+        assertThat(results).isEmpty();
+        verifyNoInteractions(userRepo);
+    }
+
+    @Test
+    void searchUsers_returnsMatchingUsersExcludingCaller() {
+        when(userRepo.findByEmail("alice@test.com")).thenReturn(Optional.of(alice));
+        when(userRepo.searchByNameOrEmail("bob", 1L)).thenReturn(List.of(bob));
+
+        List<ChatUserDto> results = conversationService.searchUsers("alice@test.com", "bob");
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).id()).isEqualTo(2L);
+        assertThat(results.get(0).name()).isEqualTo("Bob Jones");
+        verify(userRepo).searchByNameOrEmail("bob", 1L);
     }
 
     // =========================================================================

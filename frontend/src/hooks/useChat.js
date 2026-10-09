@@ -73,7 +73,7 @@ export function useChat(conversationId, onMessage) {
       clientRef.current = null;
       setConnected(false);
     };
-  }, [currentUser?.username, token]);
+  }, [currentUser?.username, currentUser?.email, token]);
 
   // ── Subscribe / unsubscribe when conversation changes ─────────────────────
   useEffect(() => {
