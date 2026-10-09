@@ -1,8 +1,10 @@
 import { Routes, Route } from 'react-router';
 import MainLayout from './layouts/MainLayout.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
-import { ProtectedRoute, RequireRole } from './components/routing/ProtectedRoute.jsx';
+import { ProtectedRoute, PublicOnlyRoute, RequireRole } from './components/routing/ProtectedRoute.jsx';
 import Home from './pages/Home.jsx';
+import LoginPage from './pages/auth/LoginPage.jsx';
+import RegisterPage from './pages/auth/RegisterPage.jsx';
 import DashboardPage from './pages/dashboard/DashboardPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import ModulePlaceholder from './pages/ModulePlaceholder.jsx';
@@ -12,6 +14,12 @@ function App() {
     <Routes>
       <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
+      </Route>
+
+      {/* Public auth routes: redirects authenticated users to /dashboard */}
+      <Route element={<PublicOnlyRoute />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
       </Route>
 
       <Route element={<ProtectedRoute />}>
