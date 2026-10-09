@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getConversations, createConversation } from '../services/chatApi.js';
+import { TOKEN_STORAGE_KEY } from '../services/api.js';
 
 /**
  * Hook to fetch and manage the authenticated user's conversation list.
@@ -18,6 +19,15 @@ export function useConversations() {
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
+    // If no JWT is present (e.g. dev demo mode), avoid triggering a 401 redirect
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      setConversations([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
