@@ -1,96 +1,158 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import api from '../services/api.js';
+import { getErrorMessage, getMyProfile } from '../services/profileService.js';
+import { demoUsers } from '../data/mockDashboardData.js';
 
-/**
- * AuthContext — placeholder for the chat module (ayushman-feature).
- *
- * TODO (Aman – auth module): Replace this placeholder with the real
- * AuthContext from the auth/profile module.  The chat module depends on:
- *   - `currentUser.username`  — must match the Spring Security principal name
- *   - `currentUser.id`        — used to distinguish own vs other messages in the UI
- *   - `currentUser.displayName` — shown in the message composer
- *   - `token`                 — Bearer token for the Authorization header
- *
- * For development, username is read from localStorage ('cc_username').
- * Set it via the browser console: localStorage.setItem('cc_username', 'yourname')
- * then refresh the page.
- */
+export const ROLES = ['STUDENT', 'TEACHER', 'ADMIN'];
+
+const DEMO_AVAILABLE = import.meta.env.DEV;
+const DEMO_ROLE_KEY = 'cc-demo-role';
 
 const AuthContext = createContext(null);
 
+function toUser(profile) {
+  const academic = profile.studentProfile || profile.teacherProfile || {};
+
+  return {
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    username: profile.email || profile.username,
+    displayName: profile.name || profile.displayName || profile.email,
+    role: profile.role,
+    profileImage: profile.profileImage || null,
+    department: academic.department || null,
+    studentProfile: profile.studentProfile || null,
+    teacherProfile: profile.teacherProfile || null,
+  };
+}
+
+function readDemoRole() {
+  const saved = sessionStorage.getItem(DEMO_ROLE_KEY);
+  return ROLES.includes(saved) ? saved : 'STUDENT';
+}
+
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [sessionUser, setSessionUser] = useState(null);
+  const [profileStatus, setProfileStatus] = useState('idle');
+  const [profileError, setProfileError] = useState(null);
+  const [demoRole, setDemoRoleState] = useState(readDemoRole);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token') || localStorage.getItem('cc_token');
-    const storedUserJson = localStorage.getItem('user');
-
-    if (storedUserJson) {
-      try {
-        const u = JSON.parse(storedUserJson);
-        setCurrentUser({
-          id: u.id,
-          email: u.email,
-          username: u.email,
-          name: u.name || u.displayName,
-          displayName: u.name || u.displayName,
-          role: u.role,
-        });
-        setToken(storedToken || null);
-        return;
-      } catch {
-        // Fall back to legacy individual keys
-      }
+    if (token) {
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
+    } else {
+      delete api.defaults.headers.common.Authorization;
     }
+  }, [token]);
 
-    const storedUsername = localStorage.getItem('cc_username') || localStorage.getItem('cc_email');
-    if (storedUsername) {
-      setCurrentUser({
-        id: localStorage.getItem('cc_userId') ? Number(localStorage.getItem('cc_userId')) : null,
-        email: storedUsername,
-        username: storedUsername,
-        name: localStorage.getItem('cc_displayName') || storedUsername,
-        displayName: localStorage.getItem('cc_displayName') || storedUsername,
-      });
-      setToken(storedToken || null);
+  const refreshProfile = useCallback(async () => {
+    setProfileStatus('loading');
+    setProfileError(null);
+
+    try {
+      setSessionUser(toUser(await getMyProfile()));
+      setProfileStatus('ready');
+    } catch (error) {
+      setProfileError(getErrorMessage(error));
+      setProfileStatus('error');
     }
   }, []);
 
-  const login = (authData) => {
-    if (authData.token) {
-      localStorage.setItem('token', authData.token);
-      localStorage.setItem('cc_token', authData.token);
-      setToken(authData.token);
-    }
-    const u = authData.user || authData;
-    const userObj = {
-      id: u.id != null ? Number(u.id) : null,
-      email: u.email || u.username,
-      username: u.email || u.username,
-      name: u.name || u.displayName || u.username,
-      displayName: u.name || u.displayName || u.username,
-      role: u.role,
-    };
-    localStorage.setItem('user', JSON.stringify(userObj));
-    localStorage.setItem('cc_username', userObj.username);
-    localStorage.setItem('cc_displayName', userObj.displayName);
-    if (userObj.id != null) localStorage.setItem('cc_userId', String(userObj.id));
-    setCurrentUser(userObj);
-  };
+  const signIn = useCallback(
+    (authResponse) => {
+      api.defaults.headers.common.Authorization =
+        `Bearer ${authResponse.token}`;
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('cc_username');
-    localStorage.removeItem('cc_displayName');
-    localStorage.removeItem('cc_userId');
-    localStorage.removeItem('cc_token');
-    setCurrentUser(null);
+      setToken(authResponse.token);
+
+      if (authResponse.user) {
+        setSessionUser(toUser(authResponse.user));
+      }
+
+      refreshProfile();
+    },
+    [refreshProfile],
+  );
+
+  const signOut = useCallback(() => {
     setToken(null);
-  };
+    setSessionUser(null);
+    setProfileStatus('idle');
+    setProfileError(null);
+  }, []);
+
+  const setDemoRole = useCallback((role) => {
+    if (!ROLES.includes(role)) return;
+
+    sessionStorage.setItem(DEMO_ROLE_KEY, role);
+    setDemoRoleState(role);
+  }, []);
+
+  const value = useMemo(() => {
+    let status = 'anonymous';
+    let user = null;
+
+    if (token) {
+      user = sessionUser;
+      status = user
+        ? 'authenticated'
+        : profileStatus === 'error'
+          ? 'error'
+          : 'loading';
+    } else if (DEMO_AVAILABLE) {
+      user = demoUsers[demoRole];
+      status = 'demo';
+    }
+
+    const currentUser = user
+      ? {
+          ...user,
+          username: user.email || user.username,
+          displayName: user.name || user.displayName || user.email,
+        }
+      : null;
+
+    return {
+      status,
+      user,
+      isDemo: status === 'demo',
+      profileStatus,
+      profileError,
+      signIn,
+      signOut,
+      refreshProfile,
+      demoRole,
+      setDemoRole,
+
+      // Compatibility aliases for the chat module.
+      currentUser,
+      login: signIn,
+      logout: signOut,
+      token,
+    };
+  }, [
+    token,
+    sessionUser,
+    profileStatus,
+    profileError,
+    demoRole,
+    signIn,
+    signOut,
+    refreshProfile,
+    setDemoRole,
+  ]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, token, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -98,5 +160,11 @@ export function AuthProvider({ children }) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error('useAuth must be used inside <AuthProvider>');
+  }
+
+  return context;
 }
