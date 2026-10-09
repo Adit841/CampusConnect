@@ -8,6 +8,8 @@ import RegisterPage from './pages/auth/RegisterPage.jsx';
 import DashboardPage from './pages/dashboard/DashboardPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import ModulePlaceholder from './pages/ModulePlaceholder.jsx';
+import ChatPage from './pages/ChatPage.jsx';
+import AcademicsPage from './pages/AcademicsPage.jsx';
 
 function App() {
   return (
@@ -26,13 +28,16 @@ function App() {
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          {/* Placeholders: replace with each module's real page when it is merged. */}
+
           <Route element={<RequireRole roles={['STUDENT', 'TEACHER']} />}>
-            <Route path="/academics" element={<ModulePlaceholder module="academics" />} />
+            <Route path="/academics" element={<AcademicsPage />} />
           </Route>
+
+          {/* Placeholders: replace with each module's real page when it is merged. */}
           <Route path="/announcements" element={<ModulePlaceholder module="announcements" />} />
           <Route path="/clubs" element={<ModulePlaceholder module="clubs" />} />
-          <Route path="/chat" element={<ModulePlaceholder module="chat" />} />
+
+          <Route path="/chat" element={<ChatPage />} />
         </Route>
       </Route>
     </Routes>

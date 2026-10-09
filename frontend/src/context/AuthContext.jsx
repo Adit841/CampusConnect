@@ -4,6 +4,7 @@ import { getErrorMessage, getMyProfile } from '../services/profileService.js';
 import { demoUsers } from '../data/mockDashboardData.js';
 
 export const ROLES = ['STUDENT', 'TEACHER', 'ADMIN'];
+
 const DEMO_AVAILABLE = import.meta.env.DEV;
 const DEMO_ROLE_KEY = 'cc-demo-role';
 const DEMO_ACTIVE_KEY = 'cc-demo-active';
@@ -13,10 +14,13 @@ const AuthContext = createContext(null);
 function toUser(profile) {
   if (!profile) return null;
   const academic = profile.studentProfile || profile.teacherProfile || {};
+
   return {
     id: profile.id,
     name: profile.name,
     email: profile.email,
+    username: profile.email || profile.username,
+    displayName: profile.name || profile.displayName || profile.email,
     role: profile.role,
     profileImage: profile.profileImage || null,
     department: academic.department || profile.department || null,
@@ -60,6 +64,7 @@ export function AuthProvider({ children }) {
   const refreshProfile = useCallback(async () => {
     setProfileStatus('loading');
     setProfileError(null);
+
     try {
       const profile = await getMyProfile();
       setSessionUser(toUser(profile));
@@ -147,6 +152,24 @@ export function AuthProvider({ children }) {
     setProfileError(null);
   }, []);
 
+  const loginWithCredentials = useCallback(
+    async (email, password) => {
+      const res = await api.post('/auth/login', { email, password });
+      signIn(res.data);
+      return res.data;
+    },
+    [signIn],
+  );
+
+  const registerWithCredentials = useCallback(
+    async (payload) => {
+      const res = await api.post('/auth/register', payload);
+      signIn(res.data);
+      return res.data;
+    },
+    [signIn],
+  );
+
   const startDemo = useCallback((role = 'STUDENT') => {
     try {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -184,6 +207,14 @@ export function AuthProvider({ children }) {
       status = 'demo';
     }
 
+    const currentUser = user
+      ? {
+          ...user,
+          username: user.email || user.username,
+          displayName: user.name || user.displayName || user.email,
+        }
+      : null;
+
     return {
       status,
       user,
@@ -197,6 +228,14 @@ export function AuthProvider({ children }) {
       startDemo,
       demoRole,
       setDemoRole,
+      loginWithCredentials,
+      registerWithCredentials,
+
+      // Compatibility aliases for the chat module.
+      currentUser,
+      login: signIn,
+      logout: signOut,
+      token,
     };
   }, [
     token,
@@ -210,13 +249,20 @@ export function AuthProvider({ children }) {
     refreshProfile,
     startDemo,
     setDemoRole,
+    loginWithCredentials,
+    registerWithCredentials,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used inside <AuthProvider>');
+
+  if (!context) {
+    throw new Error('useAuth must be used inside <AuthProvider>');
+  }
+
   return context;
 }
