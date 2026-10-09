@@ -1,5 +1,6 @@
 package com.campusconnect.controller;
 
+import com.campusconnect.dto.ChatUserDto;
 import com.campusconnect.dto.ConversationSummaryDto;
 import com.campusconnect.dto.CreateConversationRequest;
 import com.campusconnect.service.ConversationService;
@@ -76,4 +77,29 @@ public class ConversationController {
         // 200 is acceptable for idempotent "find-or-create" semantics.
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * GET /api/conversations/users/search?q={query}
+     *
+     * <p>Searches for users whose name or email matches the given query string.
+     * Used by the "New Conversation" dialog to let users find someone to chat with.
+     * The caller is excluded from results to prevent self-conversations.</p>
+     *
+     * <p>Returns at most 20 results. An empty or blank query returns an empty list.</p>
+     *
+     * @param q         Search query (name or email fragment).
+     * @param principal The authenticated user. Returns 401 if absent.
+     * @return 200 OK with a list of {@link ChatUserDto}.
+     */
+    @GetMapping("/users/search")
+    public ResponseEntity<List<ChatUserDto>> searchUsers(
+            @RequestParam(defaultValue = "") String q,
+            Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        List<ChatUserDto> users = conversationService.searchUsers(principal.getName(), q.strip());
+        return ResponseEntity.ok(users);
+    }
 }
+

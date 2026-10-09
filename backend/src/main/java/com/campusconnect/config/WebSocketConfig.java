@@ -32,10 +32,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final com.campusconnect.security.ChatSubscriptionInterceptor chatSubscriptionInterceptor;
 
-    public WebSocketConfig(JwtService jwtService, UserDetailsService userDetailsService) {
+    public WebSocketConfig(JwtService jwtService,
+                           UserDetailsService userDetailsService,
+                           com.campusconnect.security.ChatSubscriptionInterceptor chatSubscriptionInterceptor) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.chatSubscriptionInterceptor = chatSubscriptionInterceptor;
     }
 
     @Override
@@ -89,6 +93,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 }
                 return message;
             }
-        });
+        }, chatSubscriptionInterceptor);
     }
 }

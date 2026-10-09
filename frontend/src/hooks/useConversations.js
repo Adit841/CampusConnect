@@ -45,6 +45,24 @@ export function useConversations() {
     });
     return conv;
   }, []);
+  /**
+   * Updates the last message preview and timestamp for a conversation,
+   * bubbling it to the top of the conversation list.
+   */
+  const updateLastMessage = useCallback((conversationId, content, sentAt) => {
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === conversationId);
+      if (idx === -1) return prev;
+      const target = prev[idx];
+      const updated = {
+        ...target,
+        lastMessageContent: content,
+        lastMessageAt: sentAt || new Date().toISOString(),
+      };
+      const rest = prev.filter((c) => c.id !== conversationId);
+      return [updated, ...rest];
+    });
+  }, []);
 
-  return { conversations, loading, error, reload: load, startConversation };
+  return { conversations, loading, error, reload: load, startConversation, updateLastMessage };
 }

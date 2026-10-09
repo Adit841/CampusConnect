@@ -39,8 +39,15 @@ function readDemoRole() {
   return ROLES.includes(saved) ? saved : 'STUDENT';
 }
 
+const TOKEN_KEY = 'token';
+const CC_TOKEN_KEY = 'cc_token';
+
+function readStoredToken() {
+  return localStorage.getItem(TOKEN_KEY) || localStorage.getItem(CC_TOKEN_KEY) || null;
+}
+
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(readStoredToken);
   const [sessionUser, setSessionUser] = useState(null);
   const [profileStatus, setProfileStatus] = useState('idle');
   const [profileError, setProfileError] = useState(null);
@@ -48,8 +55,12 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(CC_TOKEN_KEY, token);
       api.defaults.headers.common.Authorization = `Bearer ${token}`;
     } else {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(CC_TOKEN_KEY);
       delete api.defaults.headers.common.Authorization;
     }
   }, [token]);
@@ -62,17 +73,33 @@ export function AuthProvider({ children }) {
       setSessionUser(toUser(await getMyProfile()));
       setProfileStatus('ready');
     } catch (error) {
+      if (error?.response?.status === 401) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(CC_TOKEN_KEY);
+        delete api.defaults.headers.common.Authorization;
+        setToken(null);
+        setSessionUser(null);
+      }
       setProfileError(getErrorMessage(error));
       setProfileStatus('error');
     }
   }, []);
 
+  // Hydrate profile on initial mount if token was restored from storage
+  useEffect(() => {
+    if (token && !sessionUser && profileStatus === 'idle') {
+      refreshProfile();
+    }
+  }, [token, sessionUser, profileStatus, refreshProfile]);
+
   const signIn = useCallback(
     (authResponse) => {
-      api.defaults.headers.common.Authorization =
-        `Bearer ${authResponse.token}`;
+      const jwtToken = authResponse.token;
+      localStorage.setItem(TOKEN_KEY, jwtToken);
+      localStorage.setItem(CC_TOKEN_KEY, jwtToken);
+      api.defaults.headers.common.Authorization = `Bearer ${jwtToken}`;
 
-      setToken(authResponse.token);
+      setToken(jwtToken);
 
       if (authResponse.user) {
         setSessionUser(toUser(authResponse.user));
@@ -84,11 +111,32 @@ export function AuthProvider({ children }) {
   );
 
   const signOut = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(CC_TOKEN_KEY);
+    delete api.defaults.headers.common.Authorization;
     setToken(null);
     setSessionUser(null);
     setProfileStatus('idle');
     setProfileError(null);
   }, []);
+
+  const loginWithCredentials = useCallback(
+    async (email, password) => {
+      const res = await api.post('/auth/login', { email, password });
+      signIn(res.data);
+      return res.data;
+    },
+    [signIn],
+  );
+
+  const registerWithCredentials = useCallback(
+    async (payload) => {
+      const res = await api.post('/auth/register', payload);
+      signIn(res.data);
+      return res.data;
+    },
+    [signIn],
+  );
 
   const setDemoRole = useCallback((role) => {
     if (!ROLES.includes(role)) return;
@@ -133,6 +181,9 @@ export function AuthProvider({ children }) {
       demoRole,
       setDemoRole,
 
+      loginWithCredentials,
+      registerWithCredentials,
+
       // Compatibility aliases for the chat module.
       currentUser,
       login: signIn,
@@ -149,6 +200,8 @@ export function AuthProvider({ children }) {
     signOut,
     refreshProfile,
     setDemoRole,
+    loginWithCredentials,
+    registerWithCredentials,
   ]);
 
   return (

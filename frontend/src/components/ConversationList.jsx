@@ -10,6 +10,7 @@ export default function ConversationList({
   activeId,
   onSelect,
   onRetry,
+  onNewChat,
 }) {
   return (
     <aside
@@ -17,9 +18,23 @@ export default function ConversationList({
       aria-label="Conversations"
     >
       {/* Header */}
-      <div className="px-4 py-4 border-b border-slate-100">
-        <h2 className="text-base font-bold text-slate-800 tracking-tight">Messages</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Your conversations</p>
+      <div className="px-4 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-slate-800 tracking-tight">Messages</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Your conversations</p>
+        </div>
+        {onNewChat && (
+          <button
+            onClick={onNewChat}
+            id="new-chat-header-btn"
+            title="Start new conversation"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-indigo-600 bg-indigo-50 hover:bg-indigo-100 active:scale-95 transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Body */}

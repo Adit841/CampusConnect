@@ -97,6 +97,21 @@ export function useMessages(conversationId) {
       );
     });
   }, []);
+  const reload = useCallback(() => {
+    if (conversationId == null) return;
+    setLoading(true);
+    setError(null);
+    getMessages(conversationId, 0)
+      .then((pageData) => {
+        setMessages(pageData.content);
+        setHasMore(!pageData.last);
+        setPage(1);
+      })
+      .catch((err) => {
+        setError(err.response?.data?.detail || err.message || 'Failed to load messages');
+      })
+      .finally(() => setLoading(false));
+  }, [conversationId]);
 
-  return { messages, loading, error, hasMore, loadMore, appendMessage, confirmMessage };
+  return { messages, loading, error, hasMore, loadMore, appendMessage, confirmMessage, reload };
 }

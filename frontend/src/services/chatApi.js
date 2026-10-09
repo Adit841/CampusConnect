@@ -41,9 +41,10 @@ export const sendMessageRest = (conversationId, content, clientMsgId) =>
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 /**
- * GET /api/users — list all users to start a new conversation with.
- * TODO: This endpoint will be provided by Aman's auth/profile module.
- * Until it exists, the "New Conversation" dialog is hidden.
+ * GET /api/conversations/users/search?q={query}
+ * Searches for users by name or email for the "New Conversation" dialog.
+ * @param {string} query  Search fragment (name or email).
  */
-export const getUsers = () =>
-  api.get('/users').then((r) => r.data);
+export const searchUsers = (query) =>
+  api.get('/conversations/users/search', { params: { q: query } }).then((r) => r.data);
+
