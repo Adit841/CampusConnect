@@ -156,21 +156,19 @@ export function UserMenu() {
                 Profile
               </Link>
             </li>
-            {!isDemo && (
-              <li>
-                <button
-                  type="button"
-                  onClick={() => {
-                    close();
-                    signOut();
-                  }}
-                  className={`${linkClass} w-full`}
-                >
-                  <LogOut className="size-4 text-slate-400" aria-hidden="true" />
-                  Sign out
-                </button>
-              </li>
-            )}
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  signOut();
+                }}
+                className={`${linkClass} w-full`}
+              >
+                <LogOut className="size-4 text-slate-400" aria-hidden="true" />
+                {isDemo ? 'Exit demo mode' : 'Sign out'}
+              </button>
+            </li>
           </ul>
         </div>
       )}

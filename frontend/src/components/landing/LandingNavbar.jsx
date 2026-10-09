@@ -14,7 +14,7 @@ export const landingNavLinks = [
 
 function LandingNavbar() {
   const { status } = useAuth();
-  const signedIn = status === 'authenticated';
+  const signedIn = status === 'authenticated' || status === 'demo';
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);

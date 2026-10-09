@@ -1,12 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import api from '../services/api.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import api, { TOKEN_STORAGE_KEY } from '../services/api.js';
 import { getErrorMessage, getMyProfile } from '../services/profileService.js';
 import { demoUsers } from '../data/mockDashboardData.js';
 
@@ -14,10 +7,12 @@ export const ROLES = ['STUDENT', 'TEACHER', 'ADMIN'];
 
 const DEMO_AVAILABLE = import.meta.env.DEV;
 const DEMO_ROLE_KEY = 'cc-demo-role';
+const DEMO_ACTIVE_KEY = 'cc-demo-active';
 
 const AuthContext = createContext(null);
 
 function toUser(profile) {
+  if (!profile) return null;
   const academic = profile.studentProfile || profile.teacherProfile || {};
 
   return {
@@ -28,54 +23,59 @@ function toUser(profile) {
     displayName: profile.name || profile.displayName || profile.email,
     role: profile.role,
     profileImage: profile.profileImage || null,
-    department: academic.department || null,
+    department: academic.department || profile.department || null,
     studentProfile: profile.studentProfile || null,
     teacherProfile: profile.teacherProfile || null,
   };
 }
 
-function readDemoRole() {
-  const saved = sessionStorage.getItem(DEMO_ROLE_KEY);
-  return ROLES.includes(saved) ? saved : 'STUDENT';
+function readStoredToken() {
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
 }
 
-const TOKEN_KEY = 'token';
-const CC_TOKEN_KEY = 'cc_token';
-
-function readStoredToken() {
-  return localStorage.getItem(TOKEN_KEY) || localStorage.getItem(CC_TOKEN_KEY) || null;
+function readDemoRole() {
+  try {
+    const saved = sessionStorage.getItem(DEMO_ROLE_KEY);
+    return ROLES.includes(saved) ? saved : 'STUDENT';
+  } catch {
+    return 'STUDENT';
+  }
 }
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(readStoredToken);
   const [sessionUser, setSessionUser] = useState(null);
-  const [profileStatus, setProfileStatus] = useState('idle');
+  const [profileStatus, setProfileStatus] = useState(() => (readStoredToken() ? 'loading' : 'idle'));
   const [profileError, setProfileError] = useState(null);
-  const [demoRole, setDemoRoleState] = useState(readDemoRole);
-
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(CC_TOKEN_KEY, token);
-      api.defaults.headers.common.Authorization = `Bearer ${token}`;
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(CC_TOKEN_KEY);
-      delete api.defaults.headers.common.Authorization;
+  const [isDemoActive, setIsDemoActive] = useState(() => {
+    try {
+      // In dev mode, activate demo only if explicitly enabled and no real token exists
+      return !readStoredToken() && sessionStorage.getItem(DEMO_ACTIVE_KEY) === 'true';
+    } catch {
+      return false;
     }
-  }, [token]);
+  });
+  const [demoRole, setDemoRoleState] = useState(readDemoRole);
 
   const refreshProfile = useCallback(async () => {
     setProfileStatus('loading');
     setProfileError(null);
 
     try {
-      setSessionUser(toUser(await getMyProfile()));
+      const profile = await getMyProfile();
+      setSessionUser(toUser(profile));
       setProfileStatus('ready');
     } catch (error) {
       if (error?.response?.status === 401) {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(CC_TOKEN_KEY);
+        try {
+          localStorage.removeItem(TOKEN_STORAGE_KEY);
+        } catch {
+          // Ignore
+        }
         delete api.defaults.headers.common.Authorization;
         setToken(null);
         setSessionUser(null);
@@ -85,37 +85,69 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Hydrate profile on initial mount if token was restored from storage
+  // Listen for 401 events dispatched by api.js
   useEffect(() => {
-    if (token && !sessionUser && profileStatus === 'idle') {
+    const handleUnauthorized = () => {
+      try {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        sessionStorage.removeItem(DEMO_ACTIVE_KEY);
+      } catch {
+        // Ignore
+      }
+      delete api.defaults.headers.common.Authorization;
+      setToken(null);
+      setSessionUser(null);
+      setProfileStatus('idle');
+      setIsDemoActive(false);
+    };
+
+    window.addEventListener('campusconnect:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('campusconnect:unauthorized', handleUnauthorized);
+  }, []);
+
+  // Hydrate session on mount or token change
+  useEffect(() => {
+    if (token) {
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
       refreshProfile();
+    } else {
+      delete api.defaults.headers.common.Authorization;
+      setSessionUser(null);
+      setProfileStatus('idle');
     }
-  }, [token, sessionUser, profileStatus, refreshProfile]);
+  }, [token, refreshProfile]);
 
   const signIn = useCallback(
     (authResponse) => {
-      const jwtToken = authResponse.token;
-      localStorage.setItem(TOKEN_KEY, jwtToken);
-      localStorage.setItem(CC_TOKEN_KEY, jwtToken);
-      api.defaults.headers.common.Authorization = `Bearer ${jwtToken}`;
-
-      setToken(jwtToken);
-
+      const newToken = authResponse.token;
+      try {
+        localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
+        sessionStorage.removeItem(DEMO_ACTIVE_KEY);
+      } catch {
+        // Ignore
+      }
+      setIsDemoActive(false);
+      api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+      setToken(newToken);
       if (authResponse.user) {
         setSessionUser(toUser(authResponse.user));
       }
-
       refreshProfile();
     },
     [refreshProfile],
   );
 
   const signOut = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(CC_TOKEN_KEY);
+    try {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      sessionStorage.removeItem(DEMO_ACTIVE_KEY);
+    } catch {
+      // Ignore
+    }
     delete api.defaults.headers.common.Authorization;
     setToken(null);
     setSessionUser(null);
+    setIsDemoActive(false);
     setProfileStatus('idle');
     setProfileError(null);
   }, []);
@@ -138,10 +170,28 @@ export function AuthProvider({ children }) {
     [signIn],
   );
 
+  const startDemo = useCallback((role = 'STUDENT') => {
+    try {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      sessionStorage.setItem(DEMO_ACTIVE_KEY, 'true');
+      sessionStorage.setItem(DEMO_ROLE_KEY, role);
+    } catch {
+      // Ignore
+    }
+    delete api.defaults.headers.common.Authorization;
+    setToken(null);
+    setSessionUser(null);
+    setIsDemoActive(true);
+    setDemoRoleState(role);
+  }, []);
+
   const setDemoRole = useCallback((role) => {
     if (!ROLES.includes(role)) return;
-
-    sessionStorage.setItem(DEMO_ROLE_KEY, role);
+    try {
+      sessionStorage.setItem(DEMO_ROLE_KEY, role);
+    } catch {
+      // Ignore
+    }
     setDemoRoleState(role);
   }, []);
 
@@ -151,12 +201,8 @@ export function AuthProvider({ children }) {
 
     if (token) {
       user = sessionUser;
-      status = user
-        ? 'authenticated'
-        : profileStatus === 'error'
-          ? 'error'
-          : 'loading';
-    } else if (DEMO_AVAILABLE) {
+      status = user ? 'authenticated' : profileStatus === 'error' ? 'error' : 'loading';
+    } else if (DEMO_AVAILABLE && isDemoActive) {
       user = demoUsers[demoRole];
       status = 'demo';
     }
@@ -173,14 +219,15 @@ export function AuthProvider({ children }) {
       status,
       user,
       isDemo: status === 'demo',
+      isAuthenticated: status === 'authenticated',
       profileStatus,
       profileError,
       signIn,
       signOut,
       refreshProfile,
+      startDemo,
       demoRole,
       setDemoRole,
-
       loginWithCredentials,
       registerWithCredentials,
 
@@ -195,20 +242,18 @@ export function AuthProvider({ children }) {
     sessionUser,
     profileStatus,
     profileError,
+    isDemoActive,
     demoRole,
     signIn,
     signOut,
     refreshProfile,
+    startDemo,
     setDemoRole,
     loginWithCredentials,
     registerWithCredentials,
   ]);
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

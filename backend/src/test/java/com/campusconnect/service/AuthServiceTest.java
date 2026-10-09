@@ -134,11 +134,36 @@ class AuthServiceTest {
     @Test
     void testRegisterDuplicateEmailThrowsBadRequest() {
         RegisterRequest request = new RegisterRequest();
+        request.setRole(Role.STUDENT);
         request.setEmail("duplicate@example.com");
 
         when(userRepository.existsByEmail("duplicate@example.com")).thenReturn(true);
 
         assertThrows(BadRequestException.class, () -> authService.register(request));
+    }
+
+    @Test
+    void testRegisterAdminThrowsBadRequest() {
+        RegisterRequest request = new RegisterRequest();
+        request.setName("Admin User");
+        request.setEmail("admin@example.com");
+        request.setPassword("adminPass123");
+        request.setRole(Role.ADMIN);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> authService.register(request));
+        assertEquals("Registration as ADMIN is not permitted", ex.getMessage());
+    }
+
+    @Test
+    void testRegisterNullRoleThrowsBadRequest() {
+        RegisterRequest request = new RegisterRequest();
+        request.setName("Unknown User");
+        request.setEmail("user@example.com");
+        request.setPassword("pass123");
+        request.setRole(null);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> authService.register(request));
+        assertEquals("Role is required", ex.getMessage());
     }
 
     @Test

@@ -55,6 +55,16 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        if (request.getRole() == null) {
+            throw new BadRequestException("Role is required");
+        }
+        if (request.getRole() == Role.ADMIN) {
+            throw new BadRequestException("Registration as ADMIN is not permitted");
+        }
+        if (request.getRole() != Role.STUDENT && request.getRole() != Role.TEACHER) {
+            throw new BadRequestException("Only STUDENT and TEACHER registrations are allowed");
+        }
+
         // Prevent duplicate email
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("Email is already registered: " + request.getEmail());

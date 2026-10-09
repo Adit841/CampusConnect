@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+export const TOKEN_STORAGE_KEY = 'cc_token';
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
   headers: {
@@ -7,35 +9,54 @@ const api = axios.create({
   },
 });
 
-/**
- * Request interceptor — attaches the Bearer token if one is stored.
- *
- * TODO (Aman – auth module): Replace localStorage token reading with the
- * token provided by the real AuthContext / token-refresh mechanism.
- * The chat module stores tokens under the key 'cc_token'.
- * Ensure the auth module uses the same key, or update this interceptor.
- */
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token') || localStorage.getItem('cc_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Request interceptor: attach current Bearer token from localStorage
+api.interceptors.request.use(
+  (config) => {
+    try {
+      const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+      if (token && !config.headers.Authorization) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch {
+      // Ignore storage access errors (e.g. strict privacy modes)
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
 
-/**
- * Response interceptor — stub for 401 handling.
- * TODO (Aman – auth module): Add token-refresh logic here when ready.
- */
+// Response interceptor: handle 401 Unauthorized responses
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or missing — auth module should handle redirect/refresh.
-      console.warn('[api] 401 Unauthorized — user may need to log in again.');
+    if (error.response && error.response.status === 401) {
+      const requestUrl = error.config?.url || '';
+      // Don't intercept 401 from login or register endpoints so forms can show invalid credentials error
+      const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+
+      if (!isAuthEndpoint) {
+        try {
+          localStorage.removeItem(TOKEN_STORAGE_KEY);
+        } catch {
+          // Ignore storage errors
+        }
+        delete api.defaults.headers.common.Authorization;
+
+        if (typeof window !== 'undefined') {
+          // Notify AuthContext to clear in-memory state
+          window.dispatchEvent(new CustomEvent('campusconnect:unauthorized'));
+
+          // Only redirect if user is not already on a public authentication page
+          const currentPath = window.location.pathname;
+          if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/') {
+            window.location.href = '/login';
+          }
+        }
+      }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;
+

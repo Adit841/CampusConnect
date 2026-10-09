@@ -2,13 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { GraduationCap } from 'lucide-react';
 
-/*
- * Login and registration pages belong to the authentication module, which isn't merged yet.
- * Point these at its routes (e.g. /login and /register) once they exist in App.jsx.
- */
 export const authLinks = {
-  login: '/dashboard',
-  getStarted: '/dashboard',
+  login: '/login',
+  getStarted: '/register',
 };
 
 export const landingFocusRing =
