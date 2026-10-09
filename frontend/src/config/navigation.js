@@ -22,7 +22,7 @@ export const navSections = [
       { to: '/academics', label: 'Academics', icon: BookOpen, roles: ['STUDENT', 'TEACHER'] },
       { to: '/announcements', label: 'Announcements', icon: Megaphone, roles: ['STUDENT', 'TEACHER', 'ADMIN'] },
       { to: '/clubs', label: 'Clubs & Events', icon: CalendarDays, roles: ['STUDENT', 'TEACHER', 'ADMIN'] },
-      { to: '/chat', label: 'Chat', icon: MessagesSquare, roles: ['STUDENT', 'TEACHER', 'ADMIN'] },
+      { to: '/chat', label: 'Community & Chat', icon: MessagesSquare, roles: ['STUDENT', 'TEACHER', 'ADMIN'] },
     ],
   },
   {
@@ -51,18 +51,18 @@ export const quickActions = {
     { to: '/academics', label: 'View assignments', description: 'Deadlines and coursework', icon: BookOpen },
     { to: '/announcements', label: 'Read announcements', description: 'Campus and department news', icon: Megaphone },
     { to: '/clubs', label: 'Explore clubs & events', description: 'Find something to join', icon: CalendarDays },
-    { to: '/chat', label: 'Open chat', description: 'Message classmates and teachers', icon: MessagesSquare },
+    { to: '/chat', label: 'Community & Chat', description: 'Discussions, feedback & messages', icon: MessagesSquare },
   ],
   TEACHER: [
     { to: '/academics', label: 'Go to academics', description: 'Assignments and submissions', icon: BookOpen },
     { to: '/announcements', label: 'Announcements', description: 'Notices for your classes', icon: Megaphone },
-    { to: '/chat', label: 'Open chat', description: 'Talk with students', icon: MessagesSquare },
+    { to: '/chat', label: 'Community & Chat', description: 'Campus discussions & student messages', icon: MessagesSquare },
     { to: '/profile', label: 'My profile', description: 'Department and office details', icon: UserRound },
   ],
   ADMIN: [
     { to: '/announcements', label: 'Announcements', description: 'Platform-wide notices', icon: Megaphone },
     { to: '/clubs', label: 'Clubs & events', description: 'Campus activities overview', icon: CalendarDays },
-    { to: '/chat', label: 'Open chat', description: 'Reach students and staff', icon: MessagesSquare },
+    { to: '/chat', label: 'Community & Chat', description: 'Review feedback & campus discussions', icon: MessagesSquare },
     { to: '/profile', label: 'My profile', description: 'Your account details', icon: UserRound },
   ],
 };
@@ -88,9 +88,9 @@ export const modulePlaceholders = {
     icon: CalendarDays,
   },
   chat: {
-    title: 'Chat',
+    title: 'Community & Chat',
     owner: 'Chat & Communication module',
-    description: 'Direct and group conversations between students and teachers will appear here.',
+    description: 'Campus discussions, facility feedback and direct messages between students and faculty.',
     icon: MessagesSquare,
   },
 };
