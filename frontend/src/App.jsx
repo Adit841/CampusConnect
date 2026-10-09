@@ -10,6 +10,7 @@ import DashboardPage from './pages/dashboard/DashboardPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import ModulePlaceholder from './pages/ModulePlaceholder.jsx';
 import ChatPage from './pages/ChatPage.jsx';
+import AcademicsPage from './pages/AcademicsPage.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 
 function App() {
@@ -26,10 +27,7 @@ function App() {
             <Route path="/profile" element={<ProfilePage />} />
 
             <Route element={<RequireRole roles={['STUDENT', 'TEACHER']} />}>
-              <Route
-                path="/academics"
-                element={<ModulePlaceholder module="academics" />}
-              />
+              <Route path="/academics" element={<AcademicsPage />} />
             </Route>
 
             <Route
