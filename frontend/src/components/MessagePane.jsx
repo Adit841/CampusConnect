@@ -10,9 +10,9 @@ import { formatMessageDate } from '../util/dateUtils.js';
 /**
  * Right-hand message pane — shows history and the composer for the selected conversation.
  */
-export default function MessagePane({ conversation }) {
+export default function MessagePane({ conversation, onMessageActivity }) {
   const { currentUser } = useAuth();
-  const { messages, loading, error, hasMore, loadMore, appendMessage, confirmMessage } = useMessages(
+  const { messages, loading, error, hasMore, loadMore, appendMessage, confirmMessage, reload } = useMessages(
     conversation?.id ?? null
   );
   const bottomRef = useRef(null);
@@ -22,7 +22,8 @@ export default function MessagePane({ conversation }) {
   const handleIncoming = useCallback((msg) => {
     confirmMessage(msg);
     appendMessage(msg);
-  }, [appendMessage, confirmMessage]);
+    onMessageActivity?.(msg.conversationId, msg.content, msg.sentAt);
+  }, [appendMessage, confirmMessage, onMessageActivity]);
 
   const { connected, sendMessage, wsError } = useChat(conversation?.id ?? null, handleIncoming);
 
@@ -48,6 +49,7 @@ export default function MessagePane({ conversation }) {
       _sending: true,
     };
     appendMessage(optimistic);
+    onMessageActivity?.(conversation.id, content, optimistic.sentAt);
 
     try {
       const confirmed = await sendMessage(content, clientMsgId);
@@ -60,7 +62,21 @@ export default function MessagePane({ conversation }) {
       // Mark as failed
       confirmMessage({ ...optimistic, _sending: false, _failed: true });
     }
-  }, [conversation, currentUser, appendMessage, confirmMessage, sendMessage]);
+  }, [conversation, currentUser, appendMessage, confirmMessage, sendMessage, onMessageActivity]);
+
+  const handleRetry = useCallback(async (failedMsg) => {
+    if (!conversation) return;
+    confirmMessage({ ...failedMsg, _sending: true, _failed: false });
+    try {
+      const confirmed = await sendMessage(failedMsg.content, failedMsg.clientMsgId);
+      if (confirmed) {
+        confirmMessage(confirmed);
+      }
+      onMessageActivity?.(conversation.id, failedMsg.content, failedMsg.sentAt);
+    } catch {
+      confirmMessage({ ...failedMsg, _sending: false, _failed: true });
+    }
+  }, [conversation, sendMessage, confirmMessage, onMessageActivity]);
 
   // ── No conversation selected ──────────────────────────────────────────────
   if (!conversation) {
@@ -152,7 +168,16 @@ export default function MessagePane({ conversation }) {
 
         {/* Error */}
         {error && (
-          <div className="text-center py-6 text-sm text-red-500">{error}</div>
+          <div className="flex flex-col items-center justify-center py-6 gap-2 text-center px-4">
+            <p className="text-sm text-red-500">{error}</p>
+            <button
+              type="button"
+              onClick={reload}
+              className="text-xs text-indigo-600 font-medium hover:underline focus:outline-none"
+            >
+              Retry loading
+            </button>
+          </div>
         )}
 
         {/* Empty state */}
@@ -175,6 +200,7 @@ export default function MessagePane({ conversation }) {
             <MessageBubble
               key={item.key}
               message={item.msg}
+              onRetry={handleRetry}
               isOwn={
                 (currentUser?.id != null && item.msg.senderId === currentUser.id) ||
                 item.msg.senderUsername === currentUser?.username ||

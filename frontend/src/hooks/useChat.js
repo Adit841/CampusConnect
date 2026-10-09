@@ -39,6 +39,16 @@ export function useChat(conversationId, onMessage) {
       onConnect: () => {
         setConnected(true);
         setWsError(null);
+
+        // Subscribe to server-sent error messages (validation/auth failures)
+        client.subscribe('/user/queue/errors', (frame) => {
+          try {
+            const payload = JSON.parse(frame.body);
+            setWsError(payload.error || 'Server error');
+          } catch {
+            setWsError('Server error');
+          }
+        });
       },
       onDisconnect: () => {
         setConnected(false);

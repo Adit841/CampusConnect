@@ -128,6 +128,57 @@ class ChatServiceTest {
         assertThat(result).isSameAs(conv);
     }
 
+    @Test
+    void requireMembership_throwsWhenConversationNotFound() {
+        when(userRepo.findByEmail("alice@test.com")).thenReturn(Optional.of(alice));
+        when(conversationRepo.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> conversationService.requireMembership(999L, "alice@test.com"))
+                .isInstanceOf(com.campusconnect.exception.ResourceNotFoundException.class)
+                .hasMessageContaining("Conversation not found");
+    }
+
+    @Test
+    void listForUser_ordersByLatestMessageDescending() {
+        Conversation convOld = new Conversation();
+        setId(convOld, 1L);
+        convOld.getParticipants().add(new ConversationParticipant(convOld, alice));
+        convOld.getParticipants().add(new ConversationParticipant(convOld, bob));
+
+        Conversation convNew = new Conversation();
+        setId(convNew, 2L);
+        convNew.getParticipants().add(new ConversationParticipant(convNew, alice));
+        convNew.getParticipants().add(new ConversationParticipant(convNew, bob));
+
+        when(userRepo.findByEmail("alice@test.com")).thenReturn(Optional.of(alice));
+        when(conversationRepo.findByParticipantUserId(1L)).thenReturn(List.of(convOld, convNew));
+
+        // convOld has a recent message (now)
+        Message msgRecent = new Message(convOld, bob, "Recent message", UUID.randomUUID().toString());
+        setId(msgRecent, 101L);
+        Page<Message> recentPage = new PageImpl<>(List.of(msgRecent));
+        when(messageRepo.findByConversationId(eq(1L), any())).thenReturn(recentPage);
+
+        // convNew has an older message (1 hour ago)
+        Message msgOlder = new Message(convNew, bob, "Older message", UUID.randomUUID().toString());
+        setId(msgOlder, 102L);
+        try {
+            var sentAtField = Message.class.getDeclaredField("sentAt");
+            sentAtField.setAccessible(true);
+            sentAtField.set(msgOlder, Instant.now().minusSeconds(3600));
+            sentAtField.set(msgRecent, Instant.now());
+        } catch (Exception ignored) {}
+        Page<Message> olderPage = new PageImpl<>(List.of(msgOlder));
+        when(messageRepo.findByConversationId(eq(2L), any())).thenReturn(olderPage);
+
+        List<ConversationSummaryDto> result = conversationService.listForUser("alice@test.com");
+
+        assertThat(result).hasSize(2);
+        // convOld should be first because its message is newer
+        assertThat(result.get(0).id()).isEqualTo(1L);
+        assertThat(result.get(1).id()).isEqualTo(2L);
+    }
+
     // =========================================================================
     // MessageService tests
     // =========================================================================

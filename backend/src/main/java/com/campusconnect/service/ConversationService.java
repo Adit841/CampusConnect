@@ -1,5 +1,6 @@
 package com.campusconnect.service;
 
+import com.campusconnect.dto.ChatUserDto;
 import com.campusconnect.dto.ConversationSummaryDto;
 import com.campusconnect.dto.CreateConversationRequest;
 import com.campusconnect.entity.Conversation;
@@ -53,6 +54,12 @@ public class ConversationService {
         List<Conversation> conversations = conversationRepo.findByParticipantUserId(currentUser.getId());
         return conversations.stream()
                 .map(c -> toSummary(c, currentUser))
+                .sorted((a, b) -> {
+                    if (a.lastMessageAt() == null && b.lastMessageAt() == null) return 0;
+                    if (a.lastMessageAt() == null) return 1;
+                    if (b.lastMessageAt() == null) return -1;
+                    return b.lastMessageAt().compareTo(a.lastMessageAt());
+                })
                 .toList();
     }
 
@@ -101,6 +108,22 @@ public class ConversationService {
         return userRepo.findByEmail(principalName)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "User not found for: " + principalName));
+    }
+
+    /**
+     * Searches for users by name or email for the "New Conversation" dialog.
+     * Excludes the current user and caps results at 20.
+     */
+    @Transactional(readOnly = true)
+    public List<ChatUserDto> searchUsers(String principalName, String query) {
+        if (query.isBlank()) {
+            return List.of();
+        }
+        User currentUser = requireUser(principalName);
+        return userRepo.searchByNameOrEmail(query, currentUser.getId()).stream()
+                .limit(20)
+                .map(ChatUserDto::from)
+                .toList();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
