@@ -55,12 +55,12 @@ public class AnnouncementService {
             announcements = announcementRepository.searchForAdmin(cleanCategory, cleanSearch);
         } else if (user.getRole() == Role.TEACHER) {
             String department = teacherProfileRepository.findByUser(user)
-                    .map(TeacherProfile::getDepartment)
+                    .map(tp -> tp.getDepartment())
                     .orElse(null);
             announcements = announcementRepository.searchForTeacher(user.getId(), department, cleanCategory, cleanSearch);
         } else {
             String department = studentProfileRepository.findByUser(user)
-                    .map(StudentProfile::getDepartment)
+                    .map(sp -> sp.getDepartment())
                     .orElse(null);
             announcements = announcementRepository.searchForStudent(department, cleanCategory, cleanSearch);
         }

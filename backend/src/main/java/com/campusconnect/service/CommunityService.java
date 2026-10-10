@@ -252,7 +252,7 @@ public class CommunityService {
             return List.of();
         }
 
-        List<Long> postIds = posts.stream().map(CommunityPost::getId).toList();
+        List<Long> postIds = posts.stream().map(p -> p.getId()).toList();
 
         // 1. Batch load votes for all retrieved posts
         java.util.Map<Long, List<String>> votesByPostId = new java.util.HashMap<>();
@@ -286,7 +286,7 @@ public class CommunityService {
 
         java.util.Map<Long, String> departmentsByUserId = studentProfileRepo.findByUserIdIn(userIds).stream()
                 .filter(sp -> sp.getUser() != null && sp.getDepartment() != null && !sp.getDepartment().isBlank())
-                .collect(Collectors.toMap(sp -> sp.getUser().getId(), StudentProfile::getDepartment, (a, b) -> a));
+                .collect(Collectors.toMap(sp -> sp.getUser().getId(), sp -> sp.getDepartment(), (a, b) -> a));
 
         return posts.stream().map(post -> {
             List<String> upvotedBy = votesByPostId.getOrDefault(post.getId(), List.of());
