@@ -166,6 +166,40 @@ class ConversationServiceTest {
         assertThat(list.get(1).id()).isEqualTo(10L);
     }
 
+    @Test
+    void listForUser_conversationFrom24MinutesAgoAppearsAbove1HourAnd2HoursAgo() throws Exception {
+        when(userRepo.findByEmail("alice@test.com")).thenReturn(Optional.of(user1));
+
+        Conversation conv24m = new Conversation();
+        setId(conv24m, 101L);
+        Conversation conv1h = new Conversation();
+        setId(conv1h, 102L);
+        Conversation conv2h = new Conversation();
+        setId(conv2h, 103L);
+
+        when(conversationRepo.findByParticipantUserId(1L)).thenReturn(List.of(conv2h, conv24m, conv1h));
+
+        when(participantRepo.findByConversationId(101L)).thenReturn(List.of(new ConversationParticipant(conv24m, user1), new ConversationParticipant(conv24m, user2)));
+        when(participantRepo.findByConversationId(102L)).thenReturn(List.of(new ConversationParticipant(conv1h, user1), new ConversationParticipant(conv1h, user2)));
+        when(participantRepo.findByConversationId(103L)).thenReturn(List.of(new ConversationParticipant(conv2h, user1), new ConversationParticipant(conv2h, user2)));
+
+        java.time.Instant now = java.time.Instant.now();
+        com.campusconnect.entity.Message msg24m = new com.campusconnect.entity.Message(conv24m, user2, "24 mins ago", "u-24m", now.minusSeconds(24 * 60));
+        com.campusconnect.entity.Message msg1h = new com.campusconnect.entity.Message(conv1h, user2, "1 hour ago", "u-1h", now.minusSeconds(3600));
+        com.campusconnect.entity.Message msg2h = new com.campusconnect.entity.Message(conv2h, user2, "2 hours ago", "u-2h", now.minusSeconds(7200));
+
+        when(messageRepo.findByConversationId(eq(101L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(msg24m)));
+        when(messageRepo.findByConversationId(eq(102L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(msg1h)));
+        when(messageRepo.findByConversationId(eq(103L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(msg2h)));
+
+        List<ConversationSummaryDto> list = conversationService.listForUser("alice@test.com");
+
+        assertThat(list).hasSize(3);
+        assertThat(list.get(0).id()).isEqualTo(101L);
+        assertThat(list.get(1).id()).isEqualTo(102L);
+        assertThat(list.get(2).id()).isEqualTo(103L);
+    }
+
     private void setId(Object entity, Long id) throws Exception {
         java.lang.reflect.Field idField = entity.getClass().getDeclaredField("id");
         idField.setAccessible(true);

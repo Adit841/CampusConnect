@@ -79,7 +79,7 @@ export default function ConversationList({
 
       {/* Conversation List Body */}
       <div className="flex-1 overflow-y-auto px-2 py-1 scrollbar-thin" role="list">
-        {loading && (
+        {loading && conversations.length === 0 && (
           <div className="flex flex-col gap-2 p-2" aria-label="Loading conversations">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="flex gap-3 items-center p-2 rounded-xl animate-pulse">
@@ -93,7 +93,7 @@ export default function ConversationList({
           </div>
         )}
 
-        {!loading && error && (
+        {error && conversations.length === 0 && (
           <div className="flex flex-col items-center justify-center h-48 gap-3 px-6 text-center">
             <div className="size-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center text-rose-500">
               <AlertCircle className="size-5" />

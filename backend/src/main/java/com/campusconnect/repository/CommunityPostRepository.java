@@ -12,7 +12,8 @@ import java.util.List;
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, Long> {
 
     @Query("""
-        SELECT p FROM CommunityPost p
+        SELECT DISTINCT p FROM CommunityPost p
+        JOIN FETCH p.author
         WHERE (:category IS NULL OR :category = 'all' OR LOWER(p.category) = LOWER(:category))
           AND (:query IS NULL OR :query = '' OR (
                 LOWER(p.title) LIKE LOWER(CONCAT('%', :query, '%')) OR
@@ -20,12 +21,13 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
                 LOWER(p.author.name) LIKE LOWER(CONCAT('%', :query, '%')) OR
                 LOWER(p.categoryLabel) LIKE LOWER(CONCAT('%', :query, '%'))
           ))
-        ORDER BY p.upvotesCount DESC, p.createdAt DESC
+        ORDER BY p.upvotesCount DESC, p.createdAt DESC, p.id DESC
     """)
     List<CommunityPost> findFilteredTrending(@Param("category") String category, @Param("query") String query);
 
     @Query("""
-        SELECT p FROM CommunityPost p
+        SELECT DISTINCT p FROM CommunityPost p
+        JOIN FETCH p.author
         WHERE (:category IS NULL OR :category = 'all' OR LOWER(p.category) = LOWER(:category))
           AND (:query IS NULL OR :query = '' OR (
                 LOWER(p.title) LIKE LOWER(CONCAT('%', :query, '%')) OR
@@ -33,10 +35,10 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
                 LOWER(p.author.name) LIKE LOWER(CONCAT('%', :query, '%')) OR
                 LOWER(p.categoryLabel) LIKE LOWER(CONCAT('%', :query, '%'))
           ))
-        ORDER BY p.createdAt DESC
+        ORDER BY p.createdAt DESC, p.id DESC
     """)
     List<CommunityPost> findFilteredRecent(@Param("category") String category, @Param("query") String query);
 
-    @Query("SELECT p FROM CommunityPost p WHERE p.reportsCount > 0 ORDER BY p.reportsCount DESC, p.updatedAt DESC")
+    @Query("SELECT DISTINCT p FROM CommunityPost p JOIN FETCH p.author WHERE p.reportsCount > 0 ORDER BY p.reportsCount DESC, p.updatedAt DESC, p.id DESC")
     List<CommunityPost> findReportedPosts();
 }

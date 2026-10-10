@@ -29,9 +29,17 @@ public class MessageService {
     public static final int PAGE_SIZE = 50;
 
     private final MessageRepository messageRepo;
+    private final com.campusconnect.repository.ConversationRepository conversationRepo;
 
     public MessageService(MessageRepository messageRepo) {
+        this(messageRepo, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public MessageService(MessageRepository messageRepo,
+                          com.campusconnect.repository.ConversationRepository conversationRepo) {
         this.messageRepo = messageRepo;
+        this.conversationRepo = conversationRepo;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -74,7 +82,14 @@ public class MessageService {
                             request.content().strip(),
                             request.clientMsgId()
                     );
-                    return toDto(messageRepo.save(message));
+                    Message saved = messageRepo.save(message);
+                    if (conversation != null) {
+                        conversation.setLastActivityAt(saved.getSentAt());
+                        if (conversationRepo != null) {
+                            conversationRepo.save(conversation);
+                        }
+                    }
+                    return toDto(saved);
                 });
     }
 

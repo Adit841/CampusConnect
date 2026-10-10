@@ -28,6 +28,9 @@ public class Conversation {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "last_activity_at")
+    private Instant lastActivityAt;
+
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ConversationParticipant> participants = new ArrayList<>();
 
@@ -38,17 +41,28 @@ public class Conversation {
     @PrePersist
     private void prePersist() {
         this.createdAt = Instant.now();
+        if (this.lastActivityAt == null) {
+            this.lastActivityAt = this.createdAt;
+        }
     }
 
     // ── Constructors ──────────────────────────────────────────────────────────
 
     public Conversation() {}
 
-    // ── Getters ───────────────────────────────────────────────────────────────
+    // ── Getters & Setters ─────────────────────────────────────────────────────
 
     public Long getId() { return id; }
 
     public Instant getCreatedAt() { return createdAt; }
+
+    public Instant getLastActivityAt() {
+        return lastActivityAt != null ? lastActivityAt : createdAt;
+    }
+
+    public void setLastActivityAt(Instant lastActivityAt) {
+        this.lastActivityAt = lastActivityAt;
+    }
 
     public List<ConversationParticipant> getParticipants() { return participants; }
 

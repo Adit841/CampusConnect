@@ -15,5 +15,7 @@ public interface StudentProfileRepository extends JpaRepository<StudentProfile, 
 
     Optional<StudentProfile> findByUserId(Long userId);
 
+    java.util.List<StudentProfile> findByUserIdIn(java.util.Collection<Long> userIds);
+
     boolean existsByEnrollmentNo(String enrollmentNo);
 }
