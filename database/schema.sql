@@ -204,4 +204,90 @@ CREATE TABLE IF NOT EXISTS event_registrations (
     INDEX idx_er_event (event_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ── 12. subjects (Academics) ──────────────────────────────────────────────────
+-- Students are linked through their student_profiles: a student is eligible when
+-- department matches and, where set here, course / year / section match too.
+CREATE TABLE IF NOT EXISTS subjects (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    name        VARCHAR(150) NOT NULL,
+    code        VARCHAR(30)  NOT NULL,
+    description TEXT         DEFAULT NULL,
+    credits     INT          DEFAULT NULL,
+    department  VARCHAR(255) NOT NULL,
+    course      VARCHAR(255) DEFAULT NULL,
+    year        INT          DEFAULT NULL,
+    section     VARCHAR(255) DEFAULT NULL,
+    teacher_id  BIGINT       NOT NULL,
+    created_at  DATETIME(6)  NOT NULL,
+    updated_at  DATETIME(6)  NOT NULL,
+    CONSTRAINT pk_subjects PRIMARY KEY (id),
+    CONSTRAINT uk_subjects_code UNIQUE (code),
+    CONSTRAINT fk_subjects_teacher FOREIGN KEY (teacher_id) REFERENCES users (id),
+    CONSTRAINT chk_subjects_credits CHECK (credits IS NULL OR credits BETWEEN 0 AND 20),
+    CONSTRAINT chk_subjects_year CHECK (year IS NULL OR year BETWEEN 1 AND 10),
+    INDEX idx_subjects_teacher (teacher_id),
+    INDEX idx_subjects_department (department)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── 13. assignments (Academics) ───────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS assignments (
+    id                      BIGINT       NOT NULL AUTO_INCREMENT,
+    subject_id              BIGINT       NOT NULL,
+    created_by              BIGINT       NOT NULL,
+    title                   VARCHAR(200) NOT NULL,
+    description             TEXT         DEFAULT NULL,
+    instructions            TEXT         DEFAULT NULL,
+    max_marks               INT          NOT NULL,
+    status                  VARCHAR(20)  NOT NULL DEFAULT 'DRAFT',
+    published_at            DATETIME(6)  DEFAULT NULL,
+    due_at                  DATETIME(6)  NOT NULL,
+    allow_late_submissions  BOOLEAN      NOT NULL DEFAULT FALSE,
+    attachment_name         VARCHAR(255) DEFAULT NULL,
+    attachment_storage_key  VARCHAR(80)  DEFAULT NULL,
+    attachment_content_type VARCHAR(120) DEFAULT NULL,
+    attachment_size_bytes   BIGINT       DEFAULT NULL,
+    created_at              DATETIME(6)  NOT NULL,
+    updated_at              DATETIME(6)  NOT NULL,
+    CONSTRAINT pk_assignments PRIMARY KEY (id),
+    CONSTRAINT fk_assignments_subject    FOREIGN KEY (subject_id) REFERENCES subjects (id),
+    CONSTRAINT fk_assignments_created_by FOREIGN KEY (created_by) REFERENCES users (id),
+    CONSTRAINT chk_assignments_max_marks CHECK (max_marks BETWEEN 1 AND 1000),
+    CONSTRAINT chk_assignments_status    CHECK (status IN ('DRAFT', 'PUBLISHED')),
+    INDEX idx_assignments_subject_status (subject_id, status),
+    INDEX idx_assignments_due_at (due_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── 14. submissions (Academics) ──────────────────────────────────────────────
+-- One row per (assignment, student); permitted resubmissions update the row and bump attempt_number.
+CREATE TABLE IF NOT EXISTS submissions (
+    id                BIGINT       NOT NULL AUTO_INCREMENT,
+    assignment_id     BIGINT       NOT NULL,
+    student_id        BIGINT       NOT NULL,
+    text_response     TEXT         DEFAULT NULL,
+    file_name         VARCHAR(255) DEFAULT NULL,
+    file_storage_key  VARCHAR(80)  DEFAULT NULL,
+    file_content_type VARCHAR(120) DEFAULT NULL,
+    file_size_bytes   BIGINT       DEFAULT NULL,
+    status            VARCHAR(20)  NOT NULL DEFAULT 'SUBMITTED',
+    late              BOOLEAN      NOT NULL DEFAULT FALSE,
+    attempt_number    INT          NOT NULL DEFAULT 1,
+    submitted_at      DATETIME(6)  NOT NULL,
+    marks_awarded     DECIMAL(6,2) DEFAULT NULL,
+    feedback          TEXT         DEFAULT NULL,
+    graded_at         DATETIME(6)  DEFAULT NULL,
+    graded_by         BIGINT       DEFAULT NULL,
+    returned_at       DATETIME(6)  DEFAULT NULL,
+    created_at        DATETIME(6)  NOT NULL,
+    updated_at        DATETIME(6)  NOT NULL,
+    CONSTRAINT pk_submissions PRIMARY KEY (id),
+    CONSTRAINT uk_submissions_assignment_student UNIQUE (assignment_id, student_id),
+    CONSTRAINT fk_submissions_assignment FOREIGN KEY (assignment_id) REFERENCES assignments (id),
+    CONSTRAINT fk_submissions_student    FOREIGN KEY (student_id)    REFERENCES users (id),
+    CONSTRAINT fk_submissions_graded_by  FOREIGN KEY (graded_by)     REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT chk_submissions_marks     CHECK (marks_awarded IS NULL OR marks_awarded >= 0),
+    CONSTRAINT chk_submissions_attempt   CHECK (attempt_number >= 1),
+    CONSTRAINT chk_submissions_status    CHECK (status IN ('SUBMITTED', 'GRADED', 'RETURNED')),
+    INDEX idx_submissions_student (student_id),
+    INDEX idx_submissions_assignment_status (assignment_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

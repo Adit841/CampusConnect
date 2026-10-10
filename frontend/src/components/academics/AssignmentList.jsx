@@ -1,22 +1,12 @@
-import { CalendarClock } from 'lucide-react';
+import { Paperclip } from 'lucide-react';
 import { Badge } from '../ui/Badge.jsx';
-import { priorityMeta, statusMeta } from '../../services/academicsService.js';
-import { formatDateTime, formatRelative } from '../../utils/format.js';
+import { displayStatus, formatMarks } from '../../services/academicsService.js';
 import { primaryButton, secondaryButton } from './buttonStyles.js';
-
-function StatusBadge({ assignment }) {
-  const meta = statusMeta[assignment.status];
-  return (
-    <Badge tone={meta.tone}>
-      {meta.label}
-      {assignment.demoSubmission && ' (demo)'}
-    </Badge>
-  );
-}
+import { AssignmentStatusBadge, DeadlineIndicator } from './AcademicBadges.jsx';
 
 function SubmissionProgress({ assignment }) {
-  const percent = assignment.totalStudents ? Math.round((assignment.submittedCount / assignment.totalStudents) * 100) : 0;
-  const toReview = assignment.submittedCount - assignment.reviewedCount;
+  const { totalStudents = 0, submitted = 0, awaitingReview = 0, late = 0 } = assignment.stats ?? {};
+  const percent = totalStudents ? Math.min(100, Math.round((submitted / totalStudents) * 100)) : 0;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <div
@@ -30,11 +20,19 @@ function SubmissionProgress({ assignment }) {
         <div className="h-full rounded-full bg-indigo-500" style={{ width: `${percent}%` }} />
       </div>
       <span className="text-xs tabular-nums text-slate-600 dark:text-slate-400">
-        {assignment.submittedCount}/{assignment.totalStudents} submitted
+        {submitted}/{totalStudents} submitted
       </span>
-      {toReview > 0 && <Badge tone="warning">{toReview} to review</Badge>}
+      {awaitingReview > 0 && <Badge tone="warning">{awaitingReview} to review</Badge>}
+      {late > 0 && <Badge tone="danger">{late} late</Badge>}
     </div>
   );
+}
+
+function actionLabel(role, status) {
+  if (role === 'TEACHER') return { label: 'Manage', primary: false };
+  if (role === 'ADMIN') return { label: 'View', primary: false };
+  if (status === 'PENDING') return { label: 'Submit', primary: true };
+  return { label: 'View details', primary: false };
 }
 
 /** Assignment rows; `onOpen(assignment)` opens the details dialog. */
@@ -42,29 +40,32 @@ function AssignmentList({ assignments, role, onOpen }) {
   return (
     <ul className="divide-y divide-slate-100 dark:divide-slate-800">
       {assignments.map((assignment) => {
-        const overdue = assignment.status === 'OVERDUE';
-        const canSubmit = role === 'STUDENT' && assignment.status !== 'SUBMITTED';
+        const status = displayStatus(assignment);
+        const action = actionLabel(role, status);
+        const marks = assignment.mySubmission?.marksAwarded;
         return (
           <li key={assignment.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{assignment.title}</h3>
-                <StatusBadge assignment={assignment} />
-                {assignment.priority && role === 'STUDENT' && assignment.status !== 'SUBMITTED' && (
-                  <Badge tone={priorityMeta[assignment.priority].tone}>{priorityMeta[assignment.priority].label}</Badge>
+                <AssignmentStatusBadge assignment={assignment} />
+                {status === 'GRADED' && marks != null && (
+                  <Badge tone="success">
+                    {formatMarks(marks)}/{assignment.maxMarks}
+                  </Badge>
                 )}
+                {assignment.attachment && <Paperclip className="size-3.5 text-slate-400" aria-label="Has attachment" />}
               </div>
               <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-                {assignment.subject?.name ?? 'Unknown subject'} · {assignment.subject?.code}
+                {assignment.subjectName} · {assignment.subjectCode} · {assignment.maxMarks} marks
               </p>
-              <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{assignment.summary}</p>
-              <p className={`mt-2 flex items-center gap-1.5 text-xs ${overdue ? 'font-medium text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                <CalendarClock className="size-3.5 shrink-0" aria-hidden="true" />
-                Due <time dateTime={assignment.dueAt}>{formatDateTime(assignment.dueAt)}</time>
-                <span aria-hidden="true">·</span>
-                {formatRelative(assignment.dueAt)}
-              </p>
-              {role === 'TEACHER' && (
+              {assignment.description && (
+                <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{assignment.description}</p>
+              )}
+              <div className="mt-2">
+                <DeadlineIndicator assignment={assignment} />
+              </div>
+              {role !== 'STUDENT' && assignment.status === 'PUBLISHED' && (
                 <div className="mt-2">
                   <SubmissionProgress assignment={assignment} />
                 </div>
@@ -74,10 +75,10 @@ function AssignmentList({ assignments, role, onOpen }) {
               <button
                 type="button"
                 onClick={() => onOpen(assignment)}
-                className={canSubmit ? primaryButton : secondaryButton}
-                aria-label={`${canSubmit ? 'Submit' : 'View details for'} ${assignment.title}`}
+                className={action.primary ? primaryButton : secondaryButton}
+                aria-label={`${action.label}: ${assignment.title}`}
               >
-                {canSubmit ? (overdue ? 'Submit late' : 'Submit') : 'View details'}
+                {action.label}
               </button>
             </div>
           </li>

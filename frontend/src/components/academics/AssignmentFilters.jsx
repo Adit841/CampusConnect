@@ -22,7 +22,7 @@ function AssignmentFilters({ filters, onChange, onReset, statusOptions, subjects
               type="search"
               value={filters.query}
               onChange={set('query')}
-              placeholder="Title, subject or code"
+              placeholder="Search by title"
               className={`${fieldClass} pl-9`}
             />
           </div>
@@ -47,7 +47,7 @@ function AssignmentFilters({ filters, onChange, onReset, statusOptions, subjects
           <select id={`${id}-subject`} value={filters.subjectId} onChange={set('subjectId')} className={fieldClass}>
             <option value="ALL">All subjects</option>
             {subjects.map((subject) => (
-              <option key={subject.id} value={subject.id}>{subject.name}</option>
+              <option key={subject.id} value={String(subject.id)}>{subject.name}</option>
             ))}
           </select>
         </div>
@@ -57,8 +57,8 @@ function AssignmentFilters({ filters, onChange, onReset, statusOptions, subjects
             Sort by
           </label>
           <select id={`${id}-sort`} value={filters.sort} onChange={set('sort')} className={fieldClass}>
-            <option value="DUE_ASC">Deadline: soonest first</option>
-            <option value="DUE_DESC">Deadline: latest first</option>
+            <option value="DUE_ASC">Nearest deadline</option>
+            <option value="NEWEST">Newest published</option>
           </select>
         </div>
       </div>
