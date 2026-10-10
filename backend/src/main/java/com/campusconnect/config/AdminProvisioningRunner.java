@@ -14,11 +14,15 @@ import com.campusconnect.entity.User;
 import com.campusconnect.repository.UserRepository;
 
 /**
- * Server-side provisioning runner that safely elevates the configured initial
- * administrator account on startup and ensures valid administrator credentials.
+ * Server-side provisioning runner that elevates the configured initial administrator
+ * account on startup.
  *
  * <p>This ensures administrator privileges are granted through a trusted server-side
  * mechanism rather than trusting client parameters, registration requests, or JWT payloads.</p>
+ *
+ * <p>Provisioning is disabled unless {@code ADMIN_PROVISION_EMAIL} is set. An existing account
+ * is only promoted to ADMIN; its password is never overwritten. {@code ADMIN_PROVISION_PASSWORD}
+ * is used only when the account does not exist yet.</p>
  */
 @Component
 public class AdminProvisioningRunner implements ApplicationRunner {
@@ -28,10 +32,10 @@ public class AdminProvisioningRunner implements ApplicationRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${app.admin.provision-email:pathakaayushman57@gmail.com}")
+    @Value("${app.admin.provision-email:}")
     private String provisionEmail;
 
-    @Value("${app.admin.provision-password:Password123!}")
+    @Value("${app.admin.provision-password:}")
     private String provisionPassword;
 
     public AdminProvisioningRunner(UserRepository userRepository, PasswordEncoder passwordEncoder) {
@@ -48,16 +52,8 @@ public class AdminProvisioningRunner implements ApplicationRunner {
 
         String normalizedEmail = provisionEmail.trim().toLowerCase();
         userRepository.findByEmail(normalizedEmail).ifPresentOrElse(user -> {
-            boolean updated = false;
             if (user.getRole() != Role.ADMIN) {
                 user.setRole(Role.ADMIN);
-                updated = true;
-            }
-            if (provisionPassword != null && !provisionPassword.isBlank()) {
-                user.setPassword(passwordEncoder.encode(provisionPassword));
-                updated = true;
-            }
-            if (updated) {
                 userRepository.save(user);
                 log.info("Provisioned user '{}' with ADMIN role based on server-side configuration", normalizedEmail);
             } else {
@@ -65,7 +61,7 @@ public class AdminProvisioningRunner implements ApplicationRunner {
             }
         }, () -> {
             if (provisionPassword != null && !provisionPassword.isBlank()) {
-                User newAdmin = new User("Ayushman Pathak", normalizedEmail, passwordEncoder.encode(provisionPassword), Role.ADMIN);
+                User newAdmin = new User("Administrator", normalizedEmail, passwordEncoder.encode(provisionPassword), Role.ADMIN);
                 userRepository.save(newAdmin);
                 log.info("Created and provisioned new initial administrator '{}'", normalizedEmail);
             } else {

@@ -50,6 +50,10 @@ public interface CampusEventRepository extends JpaRepository<CampusEvent, Long> 
                                      @Param("search") String search,
                                      Pageable pageable);
 
+    @Query("SELECT e.category, COUNT(e) FROM CampusEvent e WHERE e.status = 'PUBLISHED' " +
+           "AND e.endDateTime >= :now GROUP BY e.category")
+    List<Object[]> countUpcomingByCategory(@Param("now") LocalDateTime now);
+
     @Query("SELECT e FROM CampusEvent e LEFT JOIN FETCH e.club WHERE e.status = 'PUBLISHED' " +
            "AND e.featured = true AND e.endDateTime >= :now " +
            "ORDER BY e.startDateTime ASC, e.id ASC")

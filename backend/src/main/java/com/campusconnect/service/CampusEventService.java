@@ -120,18 +120,28 @@ public class CampusEventService {
 
         Map<String, Long> categoryEventCounts = new HashMap<>();
         for (EventCategory cat : EventCategory.values()) {
-            long count = eventRepo.findUpcomingEvents(now, cat, null, PageRequest.of(0, 1)).getTotalElements();
-            categoryEventCounts.put(cat.name(), count);
+            categoryEventCounts.put(cat.name(), 0L);
+        }
+        long totalUpcoming = 0;
+        for (Object[] row : eventRepo.countUpcomingByCategory(now)) {
+            long count = (Long) row[1];
+            totalUpcoming += count;
+            if (row[0] != null) {
+                categoryEventCounts.put(((EventCategory) row[0]).name(), count);
+            }
         }
 
         Map<String, Long> categoryClubCounts = new HashMap<>();
         for (ClubCategory cat : ClubCategory.values()) {
-            long count = clubRepo.findFilteredClubs(cat, null, PageRequest.of(0, 1)).getTotalElements();
-            categoryClubCounts.put(cat.name(), count);
+            categoryClubCounts.put(cat.name(), 0L);
+        }
+        for (Object[] row : clubRepo.countActiveByCategory()) {
+            if (row[0] != null) {
+                categoryClubCounts.put(((ClubCategory) row[0]).name(), (Long) row[1]);
+            }
         }
 
         long totalClubs = clubRepo.count();
-        long totalUpcoming = eventRepo.findUpcomingEvents(now, null, null, PageRequest.of(0, 1)).getTotalElements();
 
         return new ClubsLandingSummaryDto(
                 featuredDtos,

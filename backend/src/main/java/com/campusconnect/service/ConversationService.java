@@ -169,12 +169,9 @@ public class ConversationService {
                 .findFirst()
                 .orElse(currentUser); // edge case: fallback only if no other participant found
 
-        // Latest message preview (last page with 1 item, deterministic tie-breaking by id)
-        var messagePage = messageRepo.findByConversationId(
-                conversation.getId(), PageRequest.of(0, 1,
-                        org.springframework.data.domain.Sort.by("sentAt").descending()
-                                .and(org.springframework.data.domain.Sort.by("id").descending())));
-        Message last = messagePage.isEmpty() ? null : messagePage.getContent().getFirst();
+        // Latest message preview (deterministic tie-breaking by id)
+        List<Message> latest = messageRepo.findLatestByConversationId(conversation.getId(), PageRequest.of(0, 1));
+        Message last = latest.isEmpty() ? null : latest.getFirst();
 
         String lastContent = last != null ? last.getContent() : null;
         var lastAt = last != null ? last.getSentAt() : conversation.getLastActivityAt();
