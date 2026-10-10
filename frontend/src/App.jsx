@@ -8,6 +8,7 @@ import RegisterPage from './pages/auth/RegisterPage.jsx';
 import DashboardPage from './pages/dashboard/DashboardPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import ModulePlaceholder from './pages/ModulePlaceholder.jsx';
+import ClubsEventsPage from './pages/ClubsEventsPage.jsx';
 import ChatPage from './pages/ChatPage.jsx';
 import AcademicsPage from './pages/AcademicsPage.jsx';
 import AnnouncementsPage from './pages/AnnouncementsPage.jsx';
@@ -35,7 +36,7 @@ function App() {
           </Route>
 
           <Route path="/announcements" element={<AnnouncementsPage />} />
-          <Route path="/clubs" element={<ModulePlaceholder module="clubs" />} />
+          <Route path="/clubs" element={<ClubsEventsPage />} />
 
           <Route path="/chat" element={<ChatPage />} />
         </Route>
