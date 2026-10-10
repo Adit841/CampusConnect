@@ -16,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -67,7 +66,7 @@ class ConversationServiceTest {
             return c;
         });
         when(participantRepo.save(any(ConversationParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(messageRepo.findByConversationId(any(), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        when(messageRepo.findLatestByConversationId(any(), any(Pageable.class))).thenReturn(List.of());
 
         ConversationSummaryDto summary = conversationService.findOrCreate("alice@test.com", new CreateConversationRequest(2L));
 
@@ -89,7 +88,7 @@ class ConversationServiceTest {
         ConversationParticipant p1 = new ConversationParticipant(conv, user1);
         ConversationParticipant p2 = new ConversationParticipant(conv, user2);
         when(participantRepo.findByConversationId(conv.getId())).thenReturn(List.of(p1, p2));
-        when(messageRepo.findByConversationId(any(), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        when(messageRepo.findLatestByConversationId(any(), any(Pageable.class))).thenReturn(List.of());
 
         List<ConversationSummaryDto> list = conversationService.listForUser("alice@test.com");
 
@@ -123,8 +122,8 @@ class ConversationServiceTest {
         com.campusconnect.entity.Message oldMsg = new com.campusconnect.entity.Message(convOld, user2, "old msg", "uuid-old", now.minusSeconds(3600));
         com.campusconnect.entity.Message newMsg = new com.campusconnect.entity.Message(convNew, user2, "new msg", "uuid-new", now);
 
-        when(messageRepo.findByConversationId(eq(10L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(oldMsg)));
-        when(messageRepo.findByConversationId(eq(20L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(newMsg)));
+        when(messageRepo.findLatestByConversationId(eq(10L), any(Pageable.class))).thenReturn(List.of(oldMsg));
+        when(messageRepo.findLatestByConversationId(eq(20L), any(Pageable.class))).thenReturn(List.of(newMsg));
 
         List<ConversationSummaryDto> list = conversationService.listForUser("alice@test.com");
 
@@ -156,8 +155,8 @@ class ConversationServiceTest {
         com.campusconnect.entity.Message msgA = new com.campusconnect.entity.Message(convA, user2, "msg A", "uuid-a", sameTime);
         com.campusconnect.entity.Message msgB = new com.campusconnect.entity.Message(convB, user2, "msg B", "uuid-b", sameTime);
 
-        when(messageRepo.findByConversationId(eq(10L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(msgA)));
-        when(messageRepo.findByConversationId(eq(50L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(msgB)));
+        when(messageRepo.findLatestByConversationId(eq(10L), any(Pageable.class))).thenReturn(List.of(msgA));
+        when(messageRepo.findLatestByConversationId(eq(50L), any(Pageable.class))).thenReturn(List.of(msgB));
 
         List<ConversationSummaryDto> list = conversationService.listForUser("alice@test.com");
 
@@ -188,9 +187,9 @@ class ConversationServiceTest {
         com.campusconnect.entity.Message msg1h = new com.campusconnect.entity.Message(conv1h, user2, "1 hour ago", "u-1h", now.minusSeconds(3600));
         com.campusconnect.entity.Message msg2h = new com.campusconnect.entity.Message(conv2h, user2, "2 hours ago", "u-2h", now.minusSeconds(7200));
 
-        when(messageRepo.findByConversationId(eq(101L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(msg24m)));
-        when(messageRepo.findByConversationId(eq(102L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(msg1h)));
-        when(messageRepo.findByConversationId(eq(103L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(msg2h)));
+        when(messageRepo.findLatestByConversationId(eq(101L), any(Pageable.class))).thenReturn(List.of(msg24m));
+        when(messageRepo.findLatestByConversationId(eq(102L), any(Pageable.class))).thenReturn(List.of(msg1h));
+        when(messageRepo.findLatestByConversationId(eq(103L), any(Pageable.class))).thenReturn(List.of(msg2h));
 
         List<ConversationSummaryDto> list = conversationService.listForUser("alice@test.com");
 

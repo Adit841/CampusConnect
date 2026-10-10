@@ -20,6 +20,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     @Query("""
             SELECT DISTINCT c FROM Conversation c
             JOIN c.participants p
+            LEFT JOIN FETCH c.participants cp
+            LEFT JOIN FETCH cp.user
             WHERE p.user.id = :userId
             ORDER BY c.createdAt DESC
             """)

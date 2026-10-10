@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -24,6 +25,17 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             ORDER BY m.sentAt ASC
             """)
     Page<Message> findByConversationId(@Param("conversationId") Long conversationId, Pageable pageable);
+
+    /**
+     * Returns the newest messages of a conversation (newest first) without the extra count query
+     * that a {@link Page} result would run. Callers limit the size via {@code pageable}.
+     */
+    @Query("""
+            SELECT m FROM Message m
+            WHERE m.conversation.id = :conversationId
+            ORDER BY m.sentAt DESC, m.id DESC
+            """)
+    List<Message> findLatestByConversationId(@Param("conversationId") Long conversationId, Pageable pageable);
 
     /**
      * Looks up a message by its client-generated deduplication ID.

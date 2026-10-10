@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import { Outlet } from 'react-router';
 import { FlaskConical } from 'lucide-react';
+import { Spinner } from '../components/ui/StateViews.jsx';
 import AppSidebar from '../components/layout/AppSidebar.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import MobileNavigation from '../components/layout/MobileNavigation.jsx';
@@ -41,7 +42,9 @@ function DashboardLayout() {
 
         <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div className="mx-auto w-full max-w-7xl">
-            <Outlet />
+            <Suspense fallback={<Spinner label="Loading page" />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

@@ -41,5 +41,8 @@ public interface ClubRepository extends JpaRepository<Club, Long> {
                               @Param("search") String search,
                               Pageable pageable);
 
+    @Query("SELECT c.category, COUNT(c) FROM Club c WHERE c.active = true GROUP BY c.category")
+    List<Object[]> countActiveByCategory();
+
     List<Club> findTop6ByActiveTrueOrderByMemberCountDesc();
 }

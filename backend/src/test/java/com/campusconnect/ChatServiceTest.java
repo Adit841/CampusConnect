@@ -156,8 +156,7 @@ class ChatServiceTest {
         // convOld has a recent message (now)
         Message msgRecent = new Message(convOld, bob, "Recent message", UUID.randomUUID().toString());
         setId(msgRecent, 101L);
-        Page<Message> recentPage = new PageImpl<>(List.of(msgRecent));
-        when(messageRepo.findByConversationId(eq(1L), any())).thenReturn(recentPage);
+        when(messageRepo.findLatestByConversationId(eq(1L), any())).thenReturn(List.of(msgRecent));
 
         // convNew has an older message (1 hour ago)
         Message msgOlder = new Message(convNew, bob, "Older message", UUID.randomUUID().toString());
@@ -168,8 +167,7 @@ class ChatServiceTest {
             sentAtField.set(msgOlder, Instant.now().minusSeconds(3600));
             sentAtField.set(msgRecent, Instant.now());
         } catch (Exception ignored) {}
-        Page<Message> olderPage = new PageImpl<>(List.of(msgOlder));
-        when(messageRepo.findByConversationId(eq(2L), any())).thenReturn(olderPage);
+        when(messageRepo.findLatestByConversationId(eq(2L), any())).thenReturn(List.of(msgOlder));
 
         List<ConversationSummaryDto> result = conversationService.listForUser("alice@test.com");
 
