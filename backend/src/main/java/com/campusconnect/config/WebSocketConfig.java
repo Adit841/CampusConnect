@@ -54,7 +54,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        String[] origins = allowedOrigins.toArray(String[]::new);
+        String[] origins = allowedOrigins == null ? new String[0] : allowedOrigins.stream()
+                .map(String::trim)
+                .filter(o -> !o.isEmpty())
+                .toArray(String[]::new);
 
         // Native WebSocket endpoint
         registry.addEndpoint("/ws")

@@ -21,3 +21,14 @@ build/
 
 # OS
 .DS_Store
+
+# Certificates and Keyrings
+*.pem
+*.key
+*.crt
+*.jks
+*.p12
+
+# Local secret properties
+*application-local.properties
+*application-secrets.properties
