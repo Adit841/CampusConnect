@@ -55,9 +55,7 @@ public class CommunityService {
             posts = postRepo.findFilteredTrending(cat, query);
         }
 
-        return posts.stream()
-                .map(p -> toPostDto(p, currentUserId))
-                .collect(Collectors.toList());
+        return toPostDtosBatched(posts, currentUserId);
     }
 
     @Transactional(readOnly = true)
@@ -245,9 +243,114 @@ public class CommunityService {
             throw new AccessDeniedException("Only administrators can view the moderation reports queue");
         }
 
-        return postRepo.findReportedPosts().stream()
-                .map(p -> toPostDto(p, caller.getId()))
-                .collect(Collectors.toList());
+        List<CommunityPost> posts = postRepo.findReportedPosts();
+        return toPostDtosBatched(posts, caller.getId());
+    }
+
+    public List<CommunityPostDto> toPostDtosBatched(List<CommunityPost> posts, Long currentUserId) {
+        if (posts == null || posts.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> postIds = posts.stream().map(CommunityPost::getId).toList();
+
+        // 1. Batch load votes for all retrieved posts
+        java.util.Map<Long, List<String>> votesByPostId = new java.util.HashMap<>();
+        for (Object[] row : voteRepo.findVoterUserIdsByPostIds(postIds)) {
+            Long pId = (Long) row[0];
+            String uIdStr = (String) row[1];
+            votesByPostId.computeIfAbsent(pId, k -> new java.util.ArrayList<>()).add(uIdStr);
+        }
+
+        // 2. Batch load reports for all retrieved posts
+        java.util.Map<Long, List<String>> reportsByPostId = new java.util.HashMap<>();
+        for (Object[] row : reportRepo.findReporterUserIdsByPostIds(postIds)) {
+            Long pId = (Long) row[0];
+            String uIdStr = (String) row[1];
+            reportsByPostId.computeIfAbsent(pId, k -> new java.util.ArrayList<>()).add(uIdStr);
+        }
+
+        // 3. Batch load comments with authors for all retrieved posts
+        List<CommunityComment> allComments = commentRepo.findByPostIdIn(postIds);
+        java.util.Map<Long, List<CommunityComment>> commentsByPostId = allComments.stream()
+                .collect(Collectors.groupingBy(c -> c.getPost().getId()));
+
+        // 4. Batch load student profiles for departments
+        java.util.Set<Long> userIds = new java.util.HashSet<>();
+        posts.forEach(p -> {
+            if (p.getAuthor() != null) userIds.add(p.getAuthor().getId());
+        });
+        allComments.forEach(c -> {
+            if (c.getAuthor() != null) userIds.add(c.getAuthor().getId());
+        });
+
+        java.util.Map<Long, String> departmentsByUserId = studentProfileRepo.findByUserIdIn(userIds).stream()
+                .filter(sp -> sp.getUser() != null && sp.getDepartment() != null && !sp.getDepartment().isBlank())
+                .collect(Collectors.toMap(sp -> sp.getUser().getId(), StudentProfile::getDepartment, (a, b) -> a));
+
+        return posts.stream().map(post -> {
+            List<String> upvotedBy = votesByPostId.getOrDefault(post.getId(), List.of());
+            boolean hasUpvoted = currentUserId != null && upvotedBy.contains(String.valueOf(currentUserId));
+            List<String> reportedBy = reportsByPostId.getOrDefault(post.getId(), List.of());
+
+            List<CommunityComment> postComments = commentsByPostId.getOrDefault(post.getId(), List.of());
+            List<CommunityCommentDto> commentDtos = postComments.stream()
+                    .map(c -> toCommentDtoWithDept(c, departmentsByUserId.get(c.getAuthor().getId())))
+                    .toList();
+
+            int upvotes = !upvotedBy.isEmpty() ? upvotedBy.size() : post.getUpvotesCount();
+            int commentsCount = !commentDtos.isEmpty() ? commentDtos.size() : post.getCommentsCount();
+            int reportsCount = !reportedBy.isEmpty() ? reportedBy.size() : post.getReportsCount();
+
+            CommunityAuthorDto authorDto = toAuthorDtoWithDept(post.getAuthor(), departmentsByUserId.get(post.getAuthor().getId()));
+
+            return new CommunityPostDto(
+                    post.getId(),
+                    post.getTitle(),
+                    post.getContent(),
+                    post.getCategory(),
+                    post.getCategoryLabel(),
+                    post.isSuggestion(),
+                    post.getStatus(),
+                    authorDto,
+                    post.getCreatedAt(),
+                    post.getUpdatedAt(),
+                    upvotes,
+                    upvotedBy,
+                    hasUpvoted,
+                    commentsCount,
+                    commentDtos,
+                    reportsCount,
+                    reportedBy
+            );
+        }).toList();
+    }
+
+    public CommunityAuthorDto toAuthorDtoWithDept(User user, String departmentFromMap) {
+        String department = "General";
+        if (user.getRole() == Role.TEACHER) {
+            department = "Faculty";
+        } else if (departmentFromMap != null && !departmentFromMap.isBlank()) {
+            department = departmentFromMap;
+        }
+
+        String initials = computeInitials(user.getName());
+        return new CommunityAuthorDto(
+                user.getId(),
+                user.getName(),
+                user.getRole().name(),
+                department,
+                initials
+        );
+    }
+
+    public CommunityCommentDto toCommentDtoWithDept(CommunityComment comment, String departmentFromMap) {
+        return new CommunityCommentDto(
+                comment.getId(),
+                toAuthorDtoWithDept(comment.getAuthor(), departmentFromMap),
+                comment.getContent(),
+                comment.getCreatedAt()
+        );
     }
 
     @Transactional(readOnly = true)

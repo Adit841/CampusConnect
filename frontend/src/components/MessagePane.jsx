@@ -16,6 +16,11 @@ export default function MessagePane({
   onMessageActivity,
   onPresenceEvent,
   otherParticipantPresence = 'OFFLINE',
+  connected: propConnected,
+  sendMessage: propSendMessage,
+  wsError: propWsError,
+  registerActiveMessageListener,
+  registerReconnectListener,
 }) {
   const { currentUser } = useAuth();
   const { messages, loading, error, hasMore, loadMore, appendMessage, confirmMessage, reload } = useMessages(
@@ -26,27 +31,36 @@ export default function MessagePane({
 
   // Handle incoming real-time messages for this active conversation
   const handleIncoming = useCallback((msg) => {
-    confirmMessage(msg);
-    appendMessage(msg);
-    onMessageActivity?.(msg.conversationId, msg.content, msg.sentAt, msg.senderId, true);
-  }, [appendMessage, confirmMessage, onMessageActivity]);
-
-  // Handle messages across any conversation (via personal user queue)
-  const handleUserMessage = useCallback((msg) => {
-    const isCurrent = conversation && msg.conversationId === conversation.id;
-    if (isCurrent) {
+    if (conversation && msg.conversationId === conversation.id) {
       confirmMessage(msg);
       appendMessage(msg);
     }
-    onMessageActivity?.(msg.conversationId, msg.content, msg.sentAt, msg.senderId, isCurrent);
-  }, [conversation, confirmMessage, appendMessage, onMessageActivity]);
+  }, [conversation, appendMessage, confirmMessage]);
 
-  const { connected, sendMessage, wsError } = useChat(
-    conversation?.id ?? null,
+  useEffect(() => {
+    if (registerActiveMessageListener) {
+      return registerActiveMessageListener(handleIncoming);
+    }
+  }, [registerActiveMessageListener, handleIncoming]);
+
+  useEffect(() => {
+    if (registerReconnectListener) {
+      return registerReconnectListener(reload);
+    }
+  }, [registerReconnectListener, reload]);
+
+  // Fallback internal useChat only if props are not provided
+  const fallbackChat = useChat(
+    propSendMessage ? null : (conversation?.id ?? null),
     handleIncoming,
     onPresenceEvent,
-    handleUserMessage
+    handleIncoming,
+    reload
   );
+
+  const connected = propConnected !== undefined ? propConnected : fallbackChat.connected;
+  const sendMessage = propSendMessage || fallbackChat.sendMessage;
+  const wsError = propWsError !== undefined ? propWsError : fallbackChat.wsError;
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -73,7 +87,7 @@ export default function MessagePane({
     onMessageActivity?.(conversation.id, content, optimistic.sentAt, currentUser?.id, true);
 
     try {
-      const confirmed = await sendMessage(content, clientMsgId);
+      const confirmed = await sendMessage(content, clientMsgId, conversation.id);
       if (confirmed) {
         // REST fallback returned a confirmed message
         confirmMessage(confirmed);
@@ -88,7 +102,7 @@ export default function MessagePane({
     if (!conversation) return;
     confirmMessage({ ...failedMsg, _sending: true, _failed: false });
     try {
-      const confirmed = await sendMessage(failedMsg.content, failedMsg.clientMsgId);
+      const confirmed = await sendMessage(failedMsg.content, failedMsg.clientMsgId, conversation.id);
       if (confirmed) {
         confirmMessage(confirmed);
       }

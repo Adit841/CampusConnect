@@ -250,4 +250,29 @@ class CommunityServiceTest {
                 .isInstanceOf(AccessDeniedException.class);
         verify(reportRepo, never()).deleteByPostId(any());
     }
+
+    @Test
+    @DisplayName("getPosts with recent sort preserves newest post first (24 mins ago vs 1 hour ago)")
+    void testGetPostsChronologicalRecent() throws Exception {
+        java.time.Instant now = java.time.Instant.now();
+        CommunityPost post24MinAgo = new CommunityPost("Recent Post", "Content", "general", "General", false, null, student1);
+        setId(post24MinAgo, 201L);
+        java.lang.reflect.Field createdField = CommunityPost.class.getDeclaredField("createdAt");
+        createdField.setAccessible(true);
+        createdField.set(post24MinAgo, now.minusSeconds(24 * 60));
+
+        CommunityPost post1HourAgo = new CommunityPost("Older Post", "Content", "general", "General", false, null, student2);
+        setId(post1HourAgo, 202L);
+        createdField.set(post1HourAgo, now.minusSeconds(3600));
+
+        when(postRepo.findFilteredRecent(null, null)).thenReturn(java.util.List.of(post24MinAgo, post1HourAgo));
+        when(userRepo.findByEmail("alice@campus.edu")).thenReturn(Optional.of(student1));
+
+        java.util.List<CommunityPostDto> dtos = communityService.getPosts("all", "recent", null, "alice@campus.edu");
+
+        assertThat(dtos).hasSize(2);
+        assertThat(dtos.get(0).id()).isEqualTo(201L);
+        assertThat(dtos.get(1).id()).isEqualTo(202L);
+        assertThat(dtos.get(0).createdAt()).isAfter(dtos.get(1).createdAt());
+    }
 }

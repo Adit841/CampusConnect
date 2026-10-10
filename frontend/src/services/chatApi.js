@@ -25,8 +25,12 @@ export const createConversation = (targetUserId) =>
  * @param {number} conversationId
  * @param {number} page  Zero-based page index (default 0).
  */
-export const getMessages = (conversationId, page = 0) =>
-  api.get(`/conversations/${conversationId}/messages`, { params: { page } }).then((r) => r.data);
+export const getMessages = (conversationId, page = 0) => {
+  if (!conversationId || conversationId === 'undefined' || isNaN(Number(conversationId))) {
+    return Promise.resolve({ content: [], last: true, totalElements: 0, totalPages: 0 });
+  }
+  return api.get(`/conversations/${conversationId}/messages`, { params: { page } }).then((r) => r.data);
+};
 
 /**
  * POST /api/conversations/{id}/messages — REST fallback for sending a message

@@ -11,5 +11,8 @@ public interface CommunityCommentRepository extends JpaRepository<CommunityComme
 
     List<CommunityComment> findByPostIdOrderByCreatedAtAsc(Long postId);
 
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM CommunityComment c JOIN FETCH c.author WHERE c.post.id IN :postIds ORDER BY c.createdAt ASC, c.id ASC")
+    List<CommunityComment> findByPostIdIn(@org.springframework.data.repository.query.Param("postIds") java.util.Collection<Long> postIds);
+
     int countByPostId(Long postId);
 }

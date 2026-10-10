@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search,
   Plus,
@@ -22,6 +22,26 @@ import { Card, focusRing } from '../ui/Card.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { EmptyState, ErrorState, SkeletonList } from '../ui/StateViews.jsx';
 
+/**
+ * Deterministically sorts posts.
+ * - 'recent': newest creation timestamp first, tie-breaking by ID descending.
+ * - 'trending': highest upvotes first, then newest creation timestamp, tie-breaking by ID.
+ */
+export function sortFeedPosts(postList, sortMode = 'recent') {
+  if (!Array.isArray(postList)) return [];
+  return [...postList].sort((a, b) => {
+    if (sortMode === 'trending') {
+      const votesA = a.upvotes ?? a.upvotesCount ?? 0;
+      const votesB = b.upvotes ?? b.upvotesCount ?? 0;
+      if (votesB !== votesA) return votesB - votesA;
+    }
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (timeB !== timeA) return timeB - timeA;
+    return (b.id || 0) - (a.id || 0);
+  });
+}
+
 export default function CommunityFeed({ currentUser }) {
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('trending'); // 'trending' | 'recent'
@@ -33,18 +53,31 @@ export default function CommunityFeed({ currentUser }) {
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
 
-  // Load posts from backend API
-  const loadPosts = useCallback(async () => {
-    setLoading(true);
+  const postsCacheRef = useRef(new Map());
+
+  // Load posts from backend API with instant cache hydration
+  const loadPosts = useCallback(async (isRefresh = false) => {
+    const cacheKey = `${category}-${sort}-${search.trim()}`;
+    const cached = postsCacheRef.current.get(cacheKey);
+
+    if (cached && !isRefresh) {
+      setPosts(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     setError(null);
     try {
+      let data;
       if (category === 'reported') {
-        const data = await communityService.getReportedPosts();
-        setPosts(data);
+        data = await communityService.getReportedPosts();
       } else {
-        const data = await communityService.getPosts({ category, sort, search });
-        setPosts(data);
+        data = await communityService.getPosts({ category, sort, search });
       }
+      const sortedData = sortFeedPosts(data, sort);
+      postsCacheRef.current.set(cacheKey, sortedData);
+      setPosts(sortedData);
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to load community posts';
       setError(msg);
@@ -60,13 +93,25 @@ export default function CommunityFeed({ currentUser }) {
   const handleCreatePost = async (newPostData) => {
     setActionError(null);
     try {
-      await communityService.createPost(newPostData);
-      await loadPosts();
+      const createdPost = await communityService.createPost(newPostData);
+      // Immediately insert into feed at the top without full skeleton flash
+      setPosts((prev) => {
+        const remaining = prev.filter((p) => p.id !== createdPost.id);
+        const updated = sortFeedPosts([createdPost, ...remaining], sort);
+        postsCacheRef.current.clear();
+        return updated;
+      });
+      setIsCreateOpen(false);
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to create post';
       setActionError(msg);
       throw err;
     }
+  };
+
+  const handleSortChange = (newSort) => {
+    setSort(newSort);
+    setPosts((prev) => sortFeedPosts(prev, newSort));
   };
 
   const handleUpvote = async (postId) => {
@@ -281,7 +326,7 @@ export default function CommunityFeed({ currentUser }) {
         <div className="flex items-center gap-1 self-start rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
           <button
             type="button"
-            onClick={() => setSort('trending')}
+            onClick={() => handleSortChange('trending')}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
               sort === 'trending'
                 ? 'bg-indigo-600 text-white shadow-xs'
@@ -293,7 +338,7 @@ export default function CommunityFeed({ currentUser }) {
           </button>
           <button
             type="button"
-            onClick={() => setSort('recent')}
+            onClick={() => handleSortChange('recent')}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
               sort === 'recent'
                 ? 'bg-indigo-600 text-white shadow-xs'
@@ -348,16 +393,16 @@ export default function CommunityFeed({ currentUser }) {
 
       {/* ── Feed Stream ─────────────────────────────────────────────────── */}
       <div className="space-y-4">
-        {loading ? (
+        {loading && posts.length === 0 ? (
           <Card>
             <SkeletonList rows={4} />
           </Card>
-        ) : error ? (
+        ) : error && posts.length === 0 ? (
           <Card>
             <ErrorState
               title="Could not load community discussions"
               message={error}
-              onRetry={loadPosts}
+              onRetry={() => loadPosts(true)}
             />
           </Card>
         ) : posts.length === 0 ? (

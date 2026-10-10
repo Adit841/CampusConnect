@@ -36,7 +36,7 @@ export function useConversations(currentUserId) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isSilent = false) => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (!token) {
       setConversations([]);
@@ -45,7 +45,9 @@ export function useConversations(currentUserId) {
       return;
     }
 
-    setLoading(true);
+    if (!isSilent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const data = await getConversations();
@@ -84,13 +86,13 @@ export function useConversations(currentUserId) {
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.id === conversationId);
       if (idx === -1) {
-        // If not found, reload to get latest list from server
-        load();
+        // If not found, reload silently from server to fetch the newly created conversation
+        load(true);
         return prev;
       }
 
       const target = prev[idx];
-      const isFromOther = senderId != null && currentUserId != null && senderId !== currentUserId;
+      const isFromOther = senderId != null && currentUserId != null && String(senderId) !== String(currentUserId);
       const newUnread = isActive ? 0 : isFromOther ? (target.unreadCount || 0) + 1 : (target.unreadCount || 0);
 
       const updated = {

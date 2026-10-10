@@ -55,12 +55,14 @@ public class ConversationService {
         return conversations.stream()
                 .map(c -> toSummary(c, currentUser))
                 .sorted((a, b) -> {
-                    if (a.lastMessageAt() == null && b.lastMessageAt() == null) {
+                    java.time.Instant timeA = a.lastMessageAt();
+                    java.time.Instant timeB = b.lastMessageAt();
+                    if (timeA == null && timeB == null) {
                         return Long.compare(b.id(), a.id());
                     }
-                    if (a.lastMessageAt() == null) return 1;
-                    if (b.lastMessageAt() == null) return -1;
-                    int cmp = b.lastMessageAt().compareTo(a.lastMessageAt());
+                    if (timeA == null) return 1;
+                    if (timeB == null) return -1;
+                    int cmp = timeB.compareTo(timeA);
                     return cmp != 0 ? cmp : Long.compare(b.id(), a.id());
                 })
                 .toList();
@@ -142,6 +144,8 @@ public class ConversationService {
     private Conversation createNew(User user1, User user2) {
         Conversation conversation = new Conversation();
         conversation = conversationRepo.save(conversation);
+        conversation.setLastActivityAt(conversation.getCreatedAt());
+        conversation = conversationRepo.save(conversation);
         ConversationParticipant p1 = new ConversationParticipant(conversation, user1);
         ConversationParticipant p2 = new ConversationParticipant(conversation, user2);
         p1 = participantRepo.save(p1);
@@ -173,7 +177,7 @@ public class ConversationService {
         Message last = messagePage.isEmpty() ? null : messagePage.getContent().getFirst();
 
         String lastContent = last != null ? last.getContent() : null;
-        var lastAt = last != null ? last.getSentAt() : conversation.getCreatedAt();
+        var lastAt = last != null ? last.getSentAt() : conversation.getLastActivityAt();
         Long lastSenderId = last != null ? last.getSender().getId() : null;
 
         return new ConversationSummaryDto(
