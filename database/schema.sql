@@ -92,3 +92,22 @@ CREATE TABLE IF NOT EXISTS messages (
     CONSTRAINT fk_msg_sender         FOREIGN KEY (sender_id)       REFERENCES users (id)          ON DELETE CASCADE,
     INDEX idx_messages_conv_sent (conversation_id, sent_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── 7. announcements ─────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS announcements (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    title       VARCHAR(255) NOT NULL,
+    content     TEXT         NOT NULL,
+    category    VARCHAR(50)  NOT NULL DEFAULT 'GENERAL',
+    audience    VARCHAR(100) NOT NULL DEFAULT 'ALL',
+    department  VARCHAR(255) DEFAULT NULL,
+    pinned      BOOLEAN      NOT NULL DEFAULT FALSE,
+    author_id   BIGINT       NOT NULL,
+    created_at  DATETIME(6)  NOT NULL,
+    updated_at  DATETIME(6)  NOT NULL,
+    CONSTRAINT pk_announcements PRIMARY KEY (id),
+    CONSTRAINT fk_announcements_author FOREIGN KEY (author_id) REFERENCES users (id) ON DELETE CASCADE,
+    INDEX idx_announcements_audience (audience),
+    INDEX idx_announcements_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
