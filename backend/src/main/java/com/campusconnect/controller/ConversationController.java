@@ -15,17 +15,12 @@ import java.util.List;
 /**
  * REST controller for conversations.
  *
- * <h3>Auth integration (TODO – Aman)</h3>
+ * <h3>Authentication Integration</h3>
  * <p>All endpoints use {@link Principal#getName()} to identify the caller.
- * Once Aman's JWT filter is active, {@code principal} will be a non-null
- * {@code UsernamePasswordAuthenticationToken} and {@code getName()} will return
- * the authenticated username.  Until then, requests without a principal will
- * receive a 401.</p>
+ * The authenticated JWT token provides the verified user email as the principal name.</p>
  *
- * <h3>Role policy</h3>
- * <p>Any authenticated user may start or view conversations.
- * Role-based restrictions are not currently defined.
- * TODO: coordinate with the team if role restrictions are required.</p>
+ * <h3>Role Policy</h3>
+ * <p>Any authenticated user may start or view their own conversations.</p>
  */
 @RestController
 @RequestMapping("/api/conversations")

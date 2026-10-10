@@ -9,7 +9,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -168,7 +167,7 @@ public class CommunityService {
 
     private Long resolveUserId(String email) {
         if (email == null) return null;
-        return userRepo.findByEmail(email).map(User::getId).orElse(null);
+        return userRepo.findByEmail(email).map(u -> u.getId()).orElse(null);
     }
 
     private String getCategoryLabel(String category) {

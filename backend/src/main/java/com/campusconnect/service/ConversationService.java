@@ -149,8 +149,8 @@ public class ConversationService {
 
         // Find the other participant
         User other = participants.stream()
-                .map(ConversationParticipant::getUser)
-                .filter(u -> !u.getId().equals(currentUser.getId()))
+                .map(p -> p.getUser())
+                .filter(u -> u != null && !u.getId().equals(currentUser.getId()))
                 .findFirst()
                 .orElse(currentUser); // edge case: fallback only if no other participant found
 

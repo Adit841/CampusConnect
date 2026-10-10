@@ -15,7 +15,6 @@ import com.campusconnect.repository.MessageRepository;
 import com.campusconnect.repository.UserRepository;
 import com.campusconnect.service.ConversationService;
 import com.campusconnect.service.MessageService;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

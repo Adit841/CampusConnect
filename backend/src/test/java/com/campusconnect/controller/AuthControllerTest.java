@@ -22,7 +22,6 @@ import com.campusconnect.entity.Role;
 import com.campusconnect.exception.BadRequestException;
 import com.campusconnect.exception.GlobalExceptionHandler;
 import com.campusconnect.service.AuthService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
@@ -35,14 +34,11 @@ class AuthControllerTest {
     @InjectMocks
     private AuthController authController;
 
-    private ObjectMapper objectMapper;
-
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
-        objectMapper = new ObjectMapper();
     }
 
     @Test

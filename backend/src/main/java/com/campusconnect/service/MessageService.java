@@ -29,11 +29,13 @@ public class MessageService {
     public static final int PAGE_SIZE = 50;
 
     private final MessageRepository messageRepo;
-    private final ConversationService conversationService;
+
+    public MessageService(MessageRepository messageRepo) {
+        this.messageRepo = messageRepo;
+    }
 
     public MessageService(MessageRepository messageRepo, ConversationService conversationService) {
-        this.messageRepo = messageRepo;
-        this.conversationService = conversationService;
+        this(messageRepo);
     }
 
     // ── Public API ────────────────────────────────────────────────────────────

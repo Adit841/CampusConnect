@@ -20,8 +20,8 @@ public class CorsConfig {
         CorsConfiguration config = new CorsConfiguration();
         
         List<String> cleanOrigins = allowedOrigins == null ? List.of() : allowedOrigins.stream()
-                .map(String::trim)
-                .filter(origin -> !origin.isEmpty())
+                .filter(origin -> origin != null && !origin.isBlank())
+                .map(origin -> origin.trim())
                 .toList();
 
         config.setAllowedOrigins(cleanOrigins);
