@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Search,
   Plus,
@@ -19,7 +19,7 @@ import {
 } from '../../services/communityService.js';
 import { Card, focusRing } from '../ui/Card.jsx';
 import { Badge } from '../ui/Badge.jsx';
-import { EmptyState } from '../ui/StateViews.jsx';
+import { EmptyState, ErrorState, SkeletonList } from '../ui/StateViews.jsx';
 
 export default function CommunityFeed({ currentUser }) {
   const [category, setCategory] = useState('all');
@@ -27,49 +27,110 @@ export default function CommunityFeed({ currentUser }) {
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
-  // Load posts
-  const posts = useMemo(() => {
-    // refreshTrigger is used as a dependency to force re-computation
-    void refreshTrigger;
-    return communityService.getPosts({ category, sort, search });
-  }, [category, sort, search, refreshTrigger]);
+  // Load posts from backend API
+  const loadPosts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await communityService.getPosts({ category, sort, search });
+      setPosts(data);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to load community posts';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [category, sort, search]);
 
-  const handleCreatePost = (newPostData) => {
-    communityService.createPost(newPostData);
-    setRefreshTrigger((prev) => prev + 1);
-  };
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
 
-  const handleUpvote = (postId) => {
-    communityService.toggleUpvote(postId, currentUser?.id);
-    setRefreshTrigger((prev) => prev + 1);
-    if (selectedPost && selectedPost.id === postId) {
-      const updated = communityService.getPosts().find((p) => p.id === postId);
-      setSelectedPost(updated);
+  const handleCreatePost = async (newPostData) => {
+    setActionError(null);
+    try {
+      await communityService.createPost(newPostData);
+      await loadPosts();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to create post';
+      setActionError(msg);
+      throw err;
     }
   };
 
-  const handleStatusChange = (postId, newStatus) => {
-    communityService.updateStatus(postId, newStatus);
-    setRefreshTrigger((prev) => prev + 1);
-    if (selectedPost && selectedPost.id === postId) {
-      const updated = communityService.getPosts().find((p) => p.id === postId);
-      setSelectedPost(updated);
+  const handleUpvote = async (postId) => {
+    setActionError(null);
+    try {
+      const updatedPost = await communityService.toggleUpvote(postId);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost(updatedPost);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to register upvote';
+      setActionError(msg);
     }
   };
 
-  const handleAddComment = (postId, commentPayload) => {
-    const res = communityService.addComment(postId, commentPayload);
-    setRefreshTrigger((prev) => prev + 1);
-    if (selectedPost && selectedPost.id === postId) {
-      setSelectedPost(res.target);
+  const handleStatusChange = async (postId, newStatus) => {
+    setActionError(null);
+    try {
+      const updatedPost = await communityService.updateStatus(postId, newStatus);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost(updatedPost);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to update status';
+      setActionError(msg);
     }
   };
 
-  const handleReport = (postId) => {
-    communityService.reportPost(postId, currentUser?.id);
-    setRefreshTrigger((prev) => prev + 1);
+  const handleAddComment = async (postId, commentPayload) => {
+    setActionError(null);
+    try {
+      const newComment = await communityService.addComment(postId, commentPayload);
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                commentsCount: (p.commentsCount || 0) + 1,
+                comments: [...(p.comments || []), newComment],
+              }
+            : p
+        )
+      );
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost((prev) => ({
+          ...prev,
+          commentsCount: (prev.commentsCount || 0) + 1,
+          comments: [...(prev.comments || []), newComment],
+        }));
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to add comment';
+      setActionError(msg);
+    }
+  };
+
+  const handleReport = async (postId) => {
+    setActionError(null);
+    try {
+      const updatedPost = await communityService.reportPost(postId);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost(updatedPost);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to report post';
+      setActionError(msg);
+    }
   };
 
   return (
@@ -116,6 +177,23 @@ export default function CommunityFeed({ currentUser }) {
           </span>
         </div>
       </div>
+
+      {/* Action Error Banner */}
+      {actionError && (
+        <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0" />
+            <span>{actionError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="text-xs font-semibold hover:underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* ── Filter & Search Toolbar ────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -186,7 +264,19 @@ export default function CommunityFeed({ currentUser }) {
 
       {/* ── Feed Stream ─────────────────────────────────────────────────── */}
       <div className="space-y-4">
-        {posts.length === 0 ? (
+        {loading ? (
+          <Card>
+            <SkeletonList rows={4} />
+          </Card>
+        ) : error ? (
+          <Card>
+            <ErrorState
+              title="Could not load community discussions"
+              message={error}
+              onRetry={loadPosts}
+            />
+          </Card>
+        ) : posts.length === 0 ? (
           <Card>
             <EmptyState
               icon={Sparkles}

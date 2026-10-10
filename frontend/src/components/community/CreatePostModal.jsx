@@ -15,7 +15,7 @@ export default function CreatePostModal({ open, onClose, onSubmit, currentUser }
   const availableCategories = CATEGORIES.filter((c) => c.id !== 'all');
   const isFacility = category === 'facilities';
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title.trim()) {
       setError('Please provide a post title.');
@@ -27,18 +27,13 @@ export default function CreatePostModal({ open, onClose, onSubmit, currentUser }
     }
 
     setSubmitting(true);
+    setError('');
     try {
-      onSubmit({
+      await onSubmit({
         title: title.trim(),
         content: content.trim(),
         category,
-        author: {
-          id: currentUser?.id,
-          name: currentUser?.name || 'Campus Student',
-          role: currentUser?.role || 'STUDENT',
-          department: currentUser?.department || 'Computer Engineering',
-          initials: currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'ME',
-        },
+        isSuggestion: category === 'facilities',
       });
       setTitle('');
       setContent('');
@@ -46,7 +41,8 @@ export default function CreatePostModal({ open, onClose, onSubmit, currentUser }
       setError('');
       onClose();
     } catch (err) {
-      setError('Failed to create post. Please try again.');
+      const msg = err.response?.data?.message || err.message || 'Failed to create post. Please try again.';
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
