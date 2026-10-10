@@ -32,7 +32,7 @@ public class Conversation {
     private List<ConversationParticipant> participants = new ArrayList<>();
 
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("sentAt ASC")
+    @OrderBy("sentAt ASC, id ASC")
     private List<Message> messages = new ArrayList<>();
 
     @PrePersist

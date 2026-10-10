@@ -55,10 +55,13 @@ public class ConversationService {
         return conversations.stream()
                 .map(c -> toSummary(c, currentUser))
                 .sorted((a, b) -> {
-                    if (a.lastMessageAt() == null && b.lastMessageAt() == null) return 0;
+                    if (a.lastMessageAt() == null && b.lastMessageAt() == null) {
+                        return Long.compare(b.id(), a.id());
+                    }
                     if (a.lastMessageAt() == null) return 1;
                     if (b.lastMessageAt() == null) return -1;
-                    return b.lastMessageAt().compareTo(a.lastMessageAt());
+                    int cmp = b.lastMessageAt().compareTo(a.lastMessageAt());
+                    return cmp != 0 ? cmp : Long.compare(b.id(), a.id());
                 })
                 .toList();
     }
@@ -126,6 +129,14 @@ public class ConversationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<String> getParticipantEmails(Long conversationId) {
+        return participantRepo.findByConversationId(conversationId).stream()
+                .map(p -> p.getUser() != null ? p.getUser().getEmail() : null)
+                .filter(email -> email != null && !email.isBlank())
+                .toList();
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private Conversation createNew(User user1, User user2) {
@@ -154,10 +165,11 @@ public class ConversationService {
                 .findFirst()
                 .orElse(currentUser); // edge case: fallback only if no other participant found
 
-        // Latest message preview (last page with 1 item)
+        // Latest message preview (last page with 1 item, deterministic tie-breaking by id)
         var messagePage = messageRepo.findByConversationId(
                 conversation.getId(), PageRequest.of(0, 1,
-                        org.springframework.data.domain.Sort.by("sentAt").descending()));
+                        org.springframework.data.domain.Sort.by("sentAt").descending()
+                                .and(org.springframework.data.domain.Sort.by("id").descending())));
         Message last = messagePage.isEmpty() ? null : messagePage.getContent().getFirst();
 
         String lastContent = last != null ? last.getContent() : null;

@@ -9,6 +9,7 @@ import {
   Building2,
   Sparkles,
   Filter,
+  ShieldAlert,
 } from 'lucide-react';
 import PostCard from './PostCard.jsx';
 import CreatePostModal from './CreatePostModal.jsx';
@@ -37,8 +38,13 @@ export default function CommunityFeed({ currentUser }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await communityService.getPosts({ category, sort, search });
-      setPosts(data);
+      if (category === 'reported') {
+        const data = await communityService.getReportedPosts();
+        setPosts(data);
+      } else {
+        const data = await communityService.getPosts({ category, sort, search });
+        setPosts(data);
+      }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to load community posts';
       setError(msg);
@@ -129,6 +135,68 @@ export default function CommunityFeed({ currentUser }) {
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to report post';
+      setActionError(msg);
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    setActionError(null);
+    try {
+      await communityService.deletePost(postId);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost(null);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to delete post';
+      setActionError(msg);
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+    setActionError(null);
+    try {
+      await communityService.deleteComment(postId, commentId);
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== postId) return p;
+          const updatedComments = (p.comments || []).filter((c) => c.id !== commentId);
+          return {
+            ...p,
+            comments: updatedComments,
+            commentsCount: Math.max(0, (p.commentsCount || 1) - 1),
+          };
+        })
+      );
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost((prev) => ({
+          ...prev,
+          comments: (prev.comments || []).filter((c) => c.id !== commentId),
+          commentsCount: Math.max(0, (prev.commentsCount || 1) - 1),
+        }));
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to delete comment';
+      setActionError(msg);
+    }
+  };
+
+  const handleResolveReports = async (postId) => {
+    setActionError(null);
+    try {
+      await communityService.resolveReports(postId);
+      if (category === 'reported') {
+        setPosts((prev) => prev.filter((p) => p.id !== postId));
+      } else {
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postId ? { ...p, reportsCount: 0 } : p))
+        );
+      }
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost((prev) => ({ ...prev, reportsCount: 0 }));
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to resolve reports';
       setActionError(msg);
     }
   };
@@ -260,6 +328,22 @@ export default function CommunityFeed({ currentUser }) {
             </button>
           );
         })}
+
+        {/* Admin Moderation Queue Tab */}
+        {currentUser?.role === 'ADMIN' && (
+          <button
+            type="button"
+            onClick={() => setCategory('reported')}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all ${focusRing} ${
+              category === 'reported'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300'
+            }`}
+          >
+            <ShieldAlert className="size-3.5" />
+            <span>Reported Queue</span>
+          </button>
+        )}
       </div>
 
       {/* ── Feed Stream ─────────────────────────────────────────────────── */}
@@ -279,24 +363,28 @@ export default function CommunityFeed({ currentUser }) {
         ) : posts.length === 0 ? (
           <Card>
             <EmptyState
-              icon={Sparkles}
-              title="No posts found in this section"
+              icon={category === 'reported' ? ShieldAlert : Sparkles}
+              title={category === 'reported' ? 'Moderation queue is empty' : 'No posts found in this section'}
               description={
-                search
+                category === 'reported'
+                  ? 'All campus community posts are clear of flags. Great job keeping the community safe!'
+                  : search
                   ? `No community discussions matched "${search}". Try another keyword or create a new post.`
                   : 'Be the first to start a campus conversation, share an event, or report a facility issue!'
               }
             />
-            <div className="pb-6 text-center">
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(true)}
-                className={`inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 ${focusRing}`}
-              >
-                <Plus className="size-3.5" />
-                <span>Create New Post</span>
-              </button>
-            </div>
+            {category !== 'reported' && (
+              <div className="pb-6 text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(true)}
+                  className={`inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 ${focusRing}`}
+                >
+                  <Plus className="size-3.5" />
+                  <span>Create New Post</span>
+                </button>
+              </div>
+            )}
           </Card>
         ) : (
           posts.map((post) => (
@@ -309,6 +397,8 @@ export default function CommunityFeed({ currentUser }) {
               onOpenDetails={setSelectedPost}
               onStatusChange={handleStatusChange}
               onReport={handleReport}
+              onDelete={handleDeletePost}
+              onResolveReports={handleResolveReports}
             />
           ))
         )}
@@ -331,6 +421,9 @@ export default function CommunityFeed({ currentUser }) {
         onAddComment={handleAddComment}
         onStatusChange={handleStatusChange}
         onReport={handleReport}
+        onDeletePost={handleDeletePost}
+        onDeleteComment={handleDeleteComment}
+        onResolveReports={handleResolveReports}
       />
     </div>
   );

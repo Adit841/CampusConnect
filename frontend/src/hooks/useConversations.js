@@ -3,6 +3,22 @@ import { getConversations, createConversation } from '../services/chatApi.js';
 import { TOKEN_STORAGE_KEY } from '../services/api.js';
 
 /**
+ * Sorts conversations by latest activity timestamp descending (newest first).
+ * Uses conversation ID as a deterministic tie-breaker for equal or null timestamps.
+ */
+export function sortConversations(convList) {
+  if (!Array.isArray(convList)) return [];
+  return [...convList].sort((a, b) => {
+    const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+    const timeB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+    if (timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return (b.id || 0) - (a.id || 0);
+  });
+}
+
+/**
  * Hook to fetch and manage the authenticated user's conversation list.
  *
  * @returns {{
@@ -10,16 +26,17 @@ import { TOKEN_STORAGE_KEY } from '../services/api.js';
  *   loading: boolean,
  *   error: string|null,
  *   reload: function,
- *   startConversation: function
+ *   startConversation: function,
+ *   updateLastMessage: function,
+ *   markAsRead: function
  * }}
  */
-export function useConversations() {
+export function useConversations(currentUserId) {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
-    // If no JWT is present (e.g. dev demo mode), avoid triggering a 401 redirect
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (!token) {
       setConversations([]);
@@ -32,9 +49,9 @@ export function useConversations() {
     setError(null);
     try {
       const data = await getConversations();
-      setConversations(data);
+      setConversations(sortConversations(data));
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to load conversations';
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to load conversations';
       setError(msg);
     } finally {
       setLoading(false);
@@ -51,30 +68,60 @@ export function useConversations() {
     const conv = await createConversation(targetUserId);
     setConversations((prev) => {
       const exists = prev.find((c) => c.id === conv.id);
-      return exists ? prev.map((c) => (c.id === conv.id ? { ...c, ...conv } : c)) : [conv, ...prev];
+      const merged = exists
+        ? prev.map((c) => (c.id === conv.id ? { ...c, ...conv } : c))
+        : [conv, ...prev];
+      return sortConversations(merged);
     });
     return conv;
   }, []);
 
   /**
    * Updates the last message preview, sender, and timestamp for a conversation,
-   * bubbling it to the top of the conversation list.
+   * bubbles it to the top, and increments unread count if not currently active.
    */
-  const updateLastMessage = useCallback((conversationId, content, sentAt, senderId) => {
+  const updateLastMessage = useCallback((conversationId, content, sentAt, senderId, isActive = false) => {
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.id === conversationId);
-      if (idx === -1) return prev;
+      if (idx === -1) {
+        // If not found, reload to get latest list from server
+        load();
+        return prev;
+      }
+
       const target = prev[idx];
+      const isFromOther = senderId != null && currentUserId != null && senderId !== currentUserId;
+      const newUnread = isActive ? 0 : isFromOther ? (target.unreadCount || 0) + 1 : (target.unreadCount || 0);
+
       const updated = {
         ...target,
         lastMessageContent: content,
         lastMessageAt: sentAt || new Date().toISOString(),
         lastMessageSenderId: senderId !== undefined ? senderId : target.lastMessageSenderId,
+        unreadCount: newUnread,
       };
-      const rest = prev.filter((c) => c.id !== conversationId);
-      return [updated, ...rest];
+
+      const others = prev.filter((c) => c.id !== conversationId);
+      return sortConversations([updated, ...others]);
     });
+  }, [currentUserId, load]);
+
+  /**
+   * Clears the unread count for an active conversation.
+   */
+  const markAsRead = useCallback((conversationId) => {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c))
+    );
   }, []);
 
-  return { conversations, loading, error, reload: load, startConversation, updateLastMessage };
+  return {
+    conversations,
+    loading,
+    error,
+    reload: load,
+    startConversation,
+    updateLastMessage,
+    markAsRead,
+  };
 }

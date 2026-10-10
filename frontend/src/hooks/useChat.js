@@ -17,7 +17,7 @@ const WS_URL = import.meta.env.VITE_WS_BASE_URL || defaultWsUrl;
  *   wsError: string|null
  * }}
  */
-export function useChat(conversationId, onMessage, onPresence) {
+export function useChat(conversationId, onMessage, onPresence, onUserMessage) {
   const { currentUser, token } = useAuth();
   const [connected, setConnected] = useState(false);
   const [wsError, setWsError] = useState(null);
@@ -25,10 +25,12 @@ export function useChat(conversationId, onMessage, onPresence) {
   const subscriptionRef = useRef(null);
   const onMessageRef = useRef(onMessage);
   const onPresenceRef = useRef(onPresence);
+  const onUserMessageRef = useRef(onUserMessage);
 
   // Keep callback refs current without triggering reconnects
   useEffect(() => { onMessageRef.current = onMessage; }, [onMessage]);
   useEffect(() => { onPresenceRef.current = onPresence; }, [onPresence]);
+  useEffect(() => { onUserMessageRef.current = onUserMessage; }, [onUserMessage]);
 
   // ── Connect / disconnect lifecycle ────────────────────────────────────────
   useEffect(() => {
@@ -57,6 +59,16 @@ export function useChat(conversationId, onMessage, onPresence) {
           try {
             const payload = JSON.parse(frame.body);
             onPresenceRef.current?.(payload);
+          } catch {
+            // ignore
+          }
+        });
+
+        // Subscribe to user-specific incoming message queue
+        client.subscribe('/user/queue/messages', (frame) => {
+          try {
+            const payload = JSON.parse(frame.body);
+            onUserMessageRef.current?.(payload);
           } catch {
             // ignore
           }

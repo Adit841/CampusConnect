@@ -65,10 +65,15 @@ public class Message {
     public Message() {}
 
     public Message(Conversation conversation, User sender, String content, String clientMsgId) {
+        this(conversation, sender, content, clientMsgId, Instant.now());
+    }
+
+    public Message(Conversation conversation, User sender, String content, String clientMsgId, Instant sentAt) {
         this.conversation = conversation;
         this.sender = sender;
         this.content = content;
         this.clientMsgId = clientMsgId;
+        this.sentAt = sentAt;
     }
 
     // ── Getters ───────────────────────────────────────────────────────────────

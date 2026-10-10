@@ -14,23 +14,13 @@ import {
   CalendarDays,
   Compass,
   HelpCircle,
+  Trash2,
+  ShieldAlert,
 } from 'lucide-react';
 import { Card, focusRing } from '../ui/Card.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { FEEDBACK_STATUSES } from '../../services/communityService.js';
-
-function formatRelativeTime(isoString) {
-  try {
-    const diff = (Date.now() - new Date(isoString).getTime()) / 1000;
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return new Date(isoString).toLocaleDateString();
-  } catch {
-    return 'Recently';
-  }
-}
+import { formatDistanceToNow } from '../../util/dateUtils.js';
 
 function CategoryIcon({ category, className = 'size-3.5' }) {
   switch (category) {
@@ -57,13 +47,18 @@ export default function PostCard({
   onOpenDetails,
   onStatusChange,
   onReport,
+  onDelete,
+  onResolveReports,
 }) {
   const [reported, setReported] = useState(false);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const hasUpvoted = post.upvotedBy?.includes(String(currentUserId || 'current-user'));
   const isAuthor = String(post.author?.id) === String(currentUserId);
-  const canManageStatus = isAuthor || userRole === 'TEACHER' || userRole === 'ADMIN';
+  const isAdmin = userRole === 'ADMIN';
+  const canManageStatus = isAuthor || userRole === 'TEACHER' || isAdmin;
+  const canDelete = isAuthor || isAdmin;
 
   const statusConfig = post.isSuggestion ? FEEDBACK_STATUSES[post.status] || FEEDBACK_STATUSES.SUBMITTED : null;
 
@@ -82,14 +77,23 @@ export default function PostCard({
     }
   };
 
+  const handleDeleteClick = (e) => {
+    e.stopPropagation();
+    if (confirmDelete) {
+      onDelete?.(post.id);
+    } else {
+      setConfirmDelete(true);
+    }
+  };
+
   return (
     <Card className="transition-all hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md">
       <div className="p-5 sm:p-6">
         {/* Header row: Author + Badges */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/30">
-              {post.author?.initials || 'ST'}
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/30">
+              {post.author?.initials || 'CC'}
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -108,25 +112,33 @@ export default function PostCard({
                   {post.author?.role === 'TEACHER'
                     ? 'Faculty'
                     : post.author?.role === 'ADMIN'
-                    ? 'Staff'
+                    ? 'Admin'
                     : 'Student'}
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {post.author?.department ? `${post.author.department} · ` : ''}
-                {formatRelativeTime(post.createdAt)}
+                {formatDistanceToNow(post.createdAt)}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Moderation Flag Badge for Admin */}
+            {isAdmin && post.reportsCount > 0 && (
+              <Badge tone="danger" className="gap-1 py-1 font-semibold">
+                <ShieldAlert className="size-3 text-rose-600" />
+                <span>{post.reportsCount} {post.reportsCount === 1 ? 'Report' : 'Reports'}</span>
+              </Badge>
+            )}
+
             {/* Category Badge */}
             <Badge tone="neutral" className="gap-1.5 py-1">
               <CategoryIcon category={post.category} />
               {post.categoryLabel || post.category}
             </Badge>
 
-            {/* Suggestion Status Badge if facility/feedback */}
+            {/* Facility Feedback Status Pill */}
             {post.isSuggestion && statusConfig && (
               <div className="relative">
                 <button
@@ -137,17 +149,17 @@ export default function PostCard({
                   }}
                   disabled={!canManageStatus}
                   title={canManageStatus ? 'Click to change status' : statusConfig.description}
-                  className={`cursor-pointer ${canManageStatus ? 'hover:opacity-80' : 'cursor-default'}`}
+                  className={`cursor-pointer ${canManageStatus ? 'hover:opacity-85' : 'cursor-default'}`}
                 >
-                  <Badge tone={statusConfig.tone} className="gap-1 py-1 font-medium">
+                  <Badge tone={statusConfig.tone} className="gap-1.5 py-1 font-semibold">
                     {post.status === 'RESOLVED' ? (
-                      <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400" />
+                      <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                     ) : post.status === 'UNDER_REVIEW' ? (
-                      <AlertCircle className="size-3 text-indigo-600 dark:text-indigo-400" />
+                      <AlertCircle className="size-3.5 text-indigo-600 dark:text-indigo-400" />
                     ) : (
-                      <Clock className="size-3 text-amber-600 dark:text-amber-400" />
+                      <Clock className="size-3.5 text-amber-600 dark:text-amber-400" />
                     )}
-                    {statusConfig.label}
+                    <span>{statusConfig.label}</span>
                   </Badge>
                 </button>
 
@@ -195,7 +207,7 @@ export default function PostCard({
           </p>
         </div>
 
-        {/* Footer Actions: Upvote, Comments, Moderation */}
+        {/* Footer Actions */}
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
           <div className="flex items-center gap-2">
             {/* Upvote Button */}
@@ -208,7 +220,7 @@ export default function PostCard({
               aria-label={`Upvote. Current count: ${post.upvotes || 0}`}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${focusRing} ${
                 hasUpvoted
-                  ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-500'
+                  ? 'bg-indigo-600 text-white shadow-xs hover:bg-indigo-500'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
               }`}
             >
@@ -217,19 +229,35 @@ export default function PostCard({
               <span className="hidden sm:inline">{hasUpvoted ? 'Upvoted' : 'Upvote'}</span>
             </button>
 
-            {/* Comments Counter / Drawer trigger */}
+            {/* Comments Counter */}
             <button
               type="button"
               onClick={() => onOpenDetails?.(post)}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 ${focusRing}`}
             >
               <MessageSquare className="size-3.5" />
-              <span>{post.comments?.length || 0}</span>
+              <span>{post.comments?.length || post.commentsCount || 0}</span>
               <span className="hidden sm:inline">Comments</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            {/* Admin Dismiss Reports Button */}
+            {isAdmin && post.reportsCount > 0 && onResolveReports && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onResolveReports(post.id);
+                }}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 ${focusRing}`}
+                title="Dismiss and resolve user reports"
+              >
+                <span>Dismiss Flags</span>
+              </button>
+            )}
+
+            {/* Share Button */}
             <button
               type="button"
               onClick={handleShareClick}
@@ -240,6 +268,7 @@ export default function PostCard({
               <Share2 className="size-3.5" />
             </button>
 
+            {/* Report Button */}
             <button
               type="button"
               onClick={handleReportClick}
@@ -254,6 +283,25 @@ export default function PostCard({
               <Flag className="size-3.5" />
             </button>
 
+            {/* Moderation / Author Delete Button with confirmation */}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={handleDeleteClick}
+                title={confirmDelete ? 'Click again to confirm deletion' : 'Delete post'}
+                aria-label="Delete post"
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${focusRing} ${
+                  confirmDelete
+                    ? 'bg-rose-600 text-white'
+                    : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40'
+                }`}
+              >
+                <Trash2 className="size-3.5" />
+                {confirmDelete && <span>Confirm?</span>}
+              </button>
+            )}
+
+            {/* View Thread */}
             <button
               type="button"
               onClick={() => onOpenDetails?.(post)}

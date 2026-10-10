@@ -24,7 +24,7 @@ export default function ChatPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') === 'messages' ? 'messages' : 'community';
 
-  const { conversations, loading, error, reload, startConversation, updateLastMessage } = useConversations();
+  const { conversations, loading, error, reload, startConversation, updateLastMessage, markAsRead } = useConversations(currentUser?.id);
   const [activeConversation, setActiveConversation] = useState(null);
   const [showPane, setShowPane] = useState(false); // mobile nav state for DM
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -43,6 +43,7 @@ export default function ChatPage() {
 
   const handleSelect = (conv) => {
     setActiveConversation(conv);
+    markAsRead?.(conv.id);
     setShowPane(true);
   };
 
@@ -54,9 +55,10 @@ export default function ChatPage() {
     async (targetUserId) => {
       const conv = await startConversation(targetUserId);
       setActiveConversation(conv);
+      markAsRead?.(conv.id);
       setShowPane(true);
     },
-    [startConversation]
+    [startConversation, markAsRead]
   );
 
   // ── Not logged in state ───────────────────────────────────────────────────

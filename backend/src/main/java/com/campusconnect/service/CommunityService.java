@@ -23,6 +23,7 @@ public class CommunityService {
     private final CommunityReportRepository reportRepo;
     private final UserRepository userRepo;
     private final StudentProfileRepository studentProfileRepo;
+    private final ModerationAuditLogRepository moderationAuditLogRepo;
 
     public CommunityService(
             CommunityPostRepository postRepo,
@@ -30,13 +31,15 @@ public class CommunityService {
             CommunityVoteRepository voteRepo,
             CommunityReportRepository reportRepo,
             UserRepository userRepo,
-            StudentProfileRepository studentProfileRepo) {
+            StudentProfileRepository studentProfileRepo,
+            ModerationAuditLogRepository moderationAuditLogRepo) {
         this.postRepo = postRepo;
         this.commentRepo = commentRepo;
         this.voteRepo = voteRepo;
         this.reportRepo = reportRepo;
         this.userRepo = userRepo;
         this.studentProfileRepo = studentProfileRepo;
+        this.moderationAuditLogRepo = moderationAuditLogRepo;
     }
 
     @Transactional(readOnly = true)
@@ -153,6 +156,108 @@ public class CommunityService {
         }
 
         return toPostDto(post, caller.getId());
+    }
+
+    public void deletePost(Long postId, String currentUserEmail) {
+        User caller = requireUser(currentUserEmail);
+        CommunityPost post = postRepo.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Community post not found with id: " + postId));
+
+        boolean isAuthor = post.getAuthor().getId().equals(caller.getId());
+        boolean isAdmin = caller.getRole() == Role.ADMIN;
+        if (!isAuthor && !isAdmin) {
+            throw new AccessDeniedException("You are not authorized to delete this post");
+        }
+
+        if (isAdmin && !isAuthor) {
+            moderationAuditLogRepo.save(new ModerationAuditLog(
+                    "DELETE_POST",
+                    "POST",
+                    postId,
+                    "Moderator removed inappropriate post: \"" + post.getTitle() + "\"",
+                    caller.getEmail()
+            ));
+        }
+
+        postRepo.delete(post);
+    }
+
+    public void deleteComment(Long postId, Long commentId, String currentUserEmail) {
+        User caller = requireUser(currentUserEmail);
+        CommunityPost post = postRepo.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Community post not found with id: " + postId));
+        CommunityComment comment = commentRepo.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+
+        if (!comment.getPost().getId().equals(postId)) {
+            throw new BadRequestException("Comment does not belong to the specified post");
+        }
+
+        boolean isAuthor = comment.getAuthor().getId().equals(caller.getId());
+        boolean isAdmin = caller.getRole() == Role.ADMIN;
+        if (!isAuthor && !isAdmin) {
+            throw new AccessDeniedException("You are not authorized to delete this comment");
+        }
+
+        if (isAdmin && !isAuthor) {
+            moderationAuditLogRepo.save(new ModerationAuditLog(
+                    "DELETE_COMMENT",
+                    "COMMENT",
+                    commentId,
+                    "Moderator removed comment on post #" + postId,
+                    caller.getEmail()
+            ));
+        }
+
+        commentRepo.delete(comment);
+        post.setCommentsCount(Math.max(0, post.getCommentsCount() - 1));
+        postRepo.save(post);
+    }
+
+    public CommunityPostDto resolveReports(Long postId, String currentUserEmail) {
+        User caller = requireUser(currentUserEmail);
+        if (caller.getRole() != Role.ADMIN) {
+            throw new AccessDeniedException("Only administrators can resolve reports");
+        }
+
+        CommunityPost post = postRepo.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Community post not found with id: " + postId));
+
+        reportRepo.deleteByPostId(postId);
+        post.setReportsCount(0);
+        post = postRepo.save(post);
+
+        moderationAuditLogRepo.save(new ModerationAuditLog(
+                "RESOLVE_REPORTS",
+                "POST",
+                postId,
+                "Moderator dismissed and resolved reports for post: \"" + post.getTitle() + "\"",
+                caller.getEmail()
+        ));
+
+        return toPostDto(post, caller.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommunityPostDto> getReportedPosts(String currentUserEmail) {
+        User caller = requireUser(currentUserEmail);
+        if (caller.getRole() != Role.ADMIN) {
+            throw new AccessDeniedException("Only administrators can view the moderation reports queue");
+        }
+
+        return postRepo.findReportedPosts().stream()
+                .map(p -> toPostDto(p, caller.getId()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ModerationAuditLog> getModerationAuditLogs(String currentUserEmail) {
+        User caller = requireUser(currentUserEmail);
+        if (caller.getRole() != Role.ADMIN) {
+            throw new AccessDeniedException("Only administrators can view moderation audit logs");
+        }
+
+        return moderationAuditLogRepo.findAllByOrderByCreatedAtDesc();
     }
 
     // ── Helper Mappers ────────────────────────────────────────────────────────

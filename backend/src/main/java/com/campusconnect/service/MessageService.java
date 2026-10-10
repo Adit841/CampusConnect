@@ -48,7 +48,7 @@ public class MessageService {
     public Page<MessageDto> getHistory(Conversation conversation, int page) {
         return messageRepo.findByConversationId(
                         conversation.getId(),
-                        PageRequest.of(page, PAGE_SIZE, Sort.by("sentAt").ascending()))
+                        PageRequest.of(page, PAGE_SIZE, Sort.by("sentAt").ascending().and(Sort.by("id").ascending())))
                 .map(this::toDto);
     }
 

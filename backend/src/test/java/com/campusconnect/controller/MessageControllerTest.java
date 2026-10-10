@@ -45,6 +45,9 @@ class MessageControllerTest {
     @Mock
     private MessageService messageService;
 
+    @Mock
+    private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+
     @InjectMocks
     private MessageController messageController;
 

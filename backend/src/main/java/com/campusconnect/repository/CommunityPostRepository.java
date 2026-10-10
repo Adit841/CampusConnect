@@ -36,4 +36,7 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
         ORDER BY p.createdAt DESC
     """)
     List<CommunityPost> findFilteredRecent(@Param("category") String category, @Param("query") String query);
+
+    @Query("SELECT p FROM CommunityPost p WHERE p.reportsCount > 0 ORDER BY p.reportsCount DESC, p.updatedAt DESC")
+    List<CommunityPost> findReportedPosts();
 }
