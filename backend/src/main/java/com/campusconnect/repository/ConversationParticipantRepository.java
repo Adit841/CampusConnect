@@ -22,4 +22,14 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
      * Finds a specific participant row.
      */
     Optional<ConversationParticipant> findByConversationAndUser(Conversation conversation, User user);
+
+    /**
+     * Retrieves all participant records for a conversation by conversation ID.
+     */
+    java.util.List<ConversationParticipant> findByConversationId(Long conversationId);
+
+    /**
+     * Retrieves all participant records for a conversation entity.
+     */
+    java.util.List<ConversationParticipant> findByConversation(Conversation conversation);
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { Users, MessagesSquare, Plus, Sparkles, AlertCircle } from 'lucide-react';
 import ConversationList from '../components/ConversationList.jsx';
@@ -7,6 +7,7 @@ import NewConversationDialog from '../components/NewConversationDialog.jsx';
 import DevAuthModal from '../components/dev/DevAuthModal.jsx';
 import CommunityFeed from '../components/community/CommunityFeed.jsx';
 import { useConversations } from '../hooks/useConversations.js';
+import { usePresence } from '../hooks/usePresence.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Card, focusRing } from '../components/ui/Card.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
@@ -28,6 +29,13 @@ export default function ChatPage() {
   const [showPane, setShowPane] = useState(false); // mobile nav state for DM
   const [dialogOpen, setDialogOpen] = useState(false);
   const [devAuthOpen, setDevAuthOpen] = useState(false);
+
+  // Collect other participant IDs from conversation list for presence tracking
+  const participantIds = useMemo(
+    () => conversations.map((c) => c.otherParticipantId).filter(Boolean),
+    [conversations]
+  );
+  const { presenceMap, handlePresenceEvent, getStatus } = usePresence(participantIds);
 
   const handleTabChange = (tabKey) => {
     setSearchParams(tabKey === 'messages' ? { tab: 'messages' } : {});
@@ -187,6 +195,8 @@ export default function ChatPage() {
                   activeId={activeConversation?.id}
                   onSelect={handleSelect}
                   onRetry={reload}
+                  currentUserId={currentUser?.id}
+                  presenceMap={presenceMap}
                 />
 
                 <button
@@ -219,6 +229,8 @@ export default function ChatPage() {
                 <MessagePane
                   conversation={activeConversation}
                   onMessageActivity={updateLastMessage}
+                  otherParticipantPresence={getStatus(activeConversation?.otherParticipantId)}
+                  onPresenceEvent={handlePresenceEvent}
                 />
               </div>
             </div>

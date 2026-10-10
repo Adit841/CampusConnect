@@ -48,3 +48,23 @@ export const sendMessageRest = (conversationId, content, clientMsgId) =>
 export const searchUsers = (query) =>
   api.get('/conversations/users/search', { params: { q: query } }).then((r) => r.data);
 
+// ── Presence ──────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/presence/{userId}
+ * Retrieves presence status ('ONLINE' | 'OFFLINE') for a user.
+ * @param {number} userId
+ */
+export const getUserPresence = (userId) =>
+  api.get(`/presence/${userId}`).then((r) => r.data);
+
+/**
+ * GET /api/presence/batch?userIds=1,2,3
+ * Retrieves presence status for a list of user IDs.
+ * @param {number[]} userIds
+ */
+export const getBatchPresence = (userIds) => {
+  if (!userIds || userIds.length === 0) return Promise.resolve({});
+  return api.get('/presence/batch', { params: { userIds: userIds.join(',') } }).then((r) => r.data);
+};
+

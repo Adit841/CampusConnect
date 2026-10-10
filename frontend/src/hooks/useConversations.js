@@ -51,15 +51,16 @@ export function useConversations() {
     const conv = await createConversation(targetUserId);
     setConversations((prev) => {
       const exists = prev.find((c) => c.id === conv.id);
-      return exists ? prev : [conv, ...prev];
+      return exists ? prev.map((c) => (c.id === conv.id ? { ...c, ...conv } : c)) : [conv, ...prev];
     });
     return conv;
   }, []);
+
   /**
-   * Updates the last message preview and timestamp for a conversation,
+   * Updates the last message preview, sender, and timestamp for a conversation,
    * bubbling it to the top of the conversation list.
    */
-  const updateLastMessage = useCallback((conversationId, content, sentAt) => {
+  const updateLastMessage = useCallback((conversationId, content, sentAt, senderId) => {
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.id === conversationId);
       if (idx === -1) return prev;
@@ -68,6 +69,7 @@ export function useConversations() {
         ...target,
         lastMessageContent: content,
         lastMessageAt: sentAt || new Date().toISOString(),
+        lastMessageSenderId: senderId !== undefined ? senderId : target.lastMessageSenderId,
       };
       const rest = prev.filter((c) => c.id !== conversationId);
       return [updated, ...rest];
