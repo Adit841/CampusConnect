@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage.jsx';
 import ModulePlaceholder from './pages/ModulePlaceholder.jsx';
 import ChatPage from './pages/ChatPage.jsx';
 import AcademicsPage from './pages/AcademicsPage.jsx';
+import AnnouncementsPage from './pages/AnnouncementsPage.jsx';
 
 function App() {
   return (
@@ -33,8 +34,7 @@ function App() {
             <Route path="/academics" element={<AcademicsPage />} />
           </Route>
 
-          {/* Placeholders: replace with each module's real page when it is merged. */}
-          <Route path="/announcements" element={<ModulePlaceholder module="announcements" />} />
+          <Route path="/announcements" element={<AnnouncementsPage />} />
           <Route path="/clubs" element={<ModulePlaceholder module="clubs" />} />
 
           <Route path="/chat" element={<ChatPage />} />

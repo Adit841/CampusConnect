@@ -1,3 +1,4 @@
+import api from './api.js';
 import {
   mockActiveClubs,
   mockAnnouncements,
@@ -14,7 +15,6 @@ import {
 /*
  * Dashboard data for each role. Every result carries `source: 'mock' | 'api'` so the UI can label it.
  *
- * The backend currently exposes only /api/auth/** and /api/profile, so all sections below are mock.
  * When a teammate's endpoint ships, replace the matching mock with an `api.get(...)` call and map the
  * response to the same shape. Suggested contracts are listed in docs/dashboard.md.
  */
@@ -31,7 +31,27 @@ async function fromMock(build) {
   const demoState = getDemoState();
   await new Promise((resolve) => setTimeout(resolve, demoState === 'loading' ? 600000 : 350));
   if (demoState === 'error') throw new Error('Simulated failure (demoState=error).');
-  return { source: 'mock', ...build(demoState === 'empty') };
+  const built = await build(demoState === 'empty');
+  return { source: 'mock', ...built };
+}
+
+async function getLiveOrMockAnnouncements(empty) {
+  if (empty) return [];
+  try {
+    const res = await api.get('/announcements', { params: { limit: 5 } });
+    if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+      return res.data.map((a) => ({
+        id: a.id,
+        title: a.title,
+        author: a.authorName || a.author || 'Faculty',
+        postedAt: a.createdAt || a.postedAt,
+        audience: a.audience || 'Everyone',
+      }));
+    }
+  } catch {
+    // Graceful fallback to mock announcements
+  }
+  return mockAnnouncements;
 }
 
 const byDate = (key) => (a, b) => new Date(a[key]) - new Date(b[key]);
@@ -39,9 +59,9 @@ const isUpcoming = (iso) => new Date(iso) >= new Date();
 const isWithinAWeek = (iso) => isUpcoming(iso) && new Date(iso) - new Date() <= SEVEN_DAYS;
 
 export function getStudentDashboard() {
-  return fromMock((empty) => {
+  return fromMock(async (empty) => {
     const assignments = empty ? [] : mockStudentAssignments.filter((a) => isUpcoming(a.dueAt)).sort(byDate('dueAt'));
-    const announcements = empty ? [] : mockAnnouncements;
+    const announcements = await getLiveOrMockAnnouncements(empty);
     const events = empty ? [] : mockEvents;
     return {
       stats: {
@@ -59,10 +79,10 @@ export function getStudentDashboard() {
 }
 
 export function getTeacherDashboard() {
-  return fromMock((empty) => {
+  return fromMock(async (empty) => {
     const assignments = empty ? [] : [...mockTeacherAssignments].sort(byDate('dueAt'));
     const pendingReviews = empty ? [] : mockPendingReviews;
-    const announcements = empty ? [] : mockAnnouncements;
+    const announcements = await getLiveOrMockAnnouncements(empty);
     return {
       stats: {
         assignmentsCreated: assignments.length,
@@ -80,12 +100,15 @@ export function getTeacherDashboard() {
 }
 
 export function getAdminDashboard() {
-  return fromMock((empty) => ({
-    stats: empty
-      ? { total: 0, students: 0, teachers: 0, activeClubs: 0 }
-      : { ...mockUserSummary, activeClubs: mockActiveClubs },
-    activity: empty ? [] : mockPlatformActivity,
-    announcements: empty ? [] : mockAnnouncements,
-    events: empty ? [] : mockEvents,
-  }));
+  return fromMock(async (empty) => {
+    const announcements = await getLiveOrMockAnnouncements(empty);
+    return {
+      stats: empty
+        ? { total: 0, students: 0, teachers: 0, activeClubs: 0 }
+        : { ...mockUserSummary, activeClubs: mockActiveClubs },
+      activity: empty ? [] : mockPlatformActivity,
+      announcements,
+      events: empty ? [] : mockEvents,
+    };
+  });
 }
