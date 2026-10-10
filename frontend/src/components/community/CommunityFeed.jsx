@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search,
   Plus,
@@ -9,6 +9,7 @@ import {
   Building2,
   Sparkles,
   Filter,
+  ShieldAlert,
 } from 'lucide-react';
 import PostCard from './PostCard.jsx';
 import CreatePostModal from './CreatePostModal.jsx';
@@ -21,6 +22,26 @@ import { Card, focusRing } from '../ui/Card.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { EmptyState, ErrorState, SkeletonList } from '../ui/StateViews.jsx';
 
+/**
+ * Deterministically sorts posts.
+ * - 'recent': newest creation timestamp first, tie-breaking by ID descending.
+ * - 'trending': highest upvotes first, then newest creation timestamp, tie-breaking by ID.
+ */
+export function sortFeedPosts(postList, sortMode = 'recent') {
+  if (!Array.isArray(postList)) return [];
+  return [...postList].sort((a, b) => {
+    if (sortMode === 'trending') {
+      const votesA = a.upvotes ?? a.upvotesCount ?? 0;
+      const votesB = b.upvotes ?? b.upvotesCount ?? 0;
+      if (votesB !== votesA) return votesB - votesA;
+    }
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (timeB !== timeA) return timeB - timeA;
+    return (b.id || 0) - (a.id || 0);
+  });
+}
+
 export default function CommunityFeed({ currentUser }) {
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('trending'); // 'trending' | 'recent'
@@ -32,13 +53,31 @@ export default function CommunityFeed({ currentUser }) {
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
 
-  // Load posts from backend API
-  const loadPosts = useCallback(async () => {
-    setLoading(true);
+  const postsCacheRef = useRef(new Map());
+
+  // Load posts from backend API with instant cache hydration
+  const loadPosts = useCallback(async (isRefresh = false) => {
+    const cacheKey = `${category}-${sort}-${search.trim()}`;
+    const cached = postsCacheRef.current.get(cacheKey);
+
+    if (cached && !isRefresh) {
+      setPosts(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     setError(null);
     try {
-      const data = await communityService.getPosts({ category, sort, search });
-      setPosts(data);
+      let data;
+      if (category === 'reported') {
+        data = await communityService.getReportedPosts();
+      } else {
+        data = await communityService.getPosts({ category, sort, search });
+      }
+      const sortedData = sortFeedPosts(data, sort);
+      postsCacheRef.current.set(cacheKey, sortedData);
+      setPosts(sortedData);
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to load community posts';
       setError(msg);
@@ -54,13 +93,25 @@ export default function CommunityFeed({ currentUser }) {
   const handleCreatePost = async (newPostData) => {
     setActionError(null);
     try {
-      await communityService.createPost(newPostData);
-      await loadPosts();
+      const createdPost = await communityService.createPost(newPostData);
+      // Immediately insert into feed at the top without full skeleton flash
+      setPosts((prev) => {
+        const remaining = prev.filter((p) => p.id !== createdPost.id);
+        const updated = sortFeedPosts([createdPost, ...remaining], sort);
+        postsCacheRef.current.clear();
+        return updated;
+      });
+      setIsCreateOpen(false);
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to create post';
       setActionError(msg);
       throw err;
     }
+  };
+
+  const handleSortChange = (newSort) => {
+    setSort(newSort);
+    setPosts((prev) => sortFeedPosts(prev, newSort));
   };
 
   const handleUpvote = async (postId) => {
@@ -129,6 +180,68 @@ export default function CommunityFeed({ currentUser }) {
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to report post';
+      setActionError(msg);
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    setActionError(null);
+    try {
+      await communityService.deletePost(postId);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost(null);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to delete post';
+      setActionError(msg);
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+    setActionError(null);
+    try {
+      await communityService.deleteComment(postId, commentId);
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== postId) return p;
+          const updatedComments = (p.comments || []).filter((c) => c.id !== commentId);
+          return {
+            ...p,
+            comments: updatedComments,
+            commentsCount: Math.max(0, (p.commentsCount || 1) - 1),
+          };
+        })
+      );
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost((prev) => ({
+          ...prev,
+          comments: (prev.comments || []).filter((c) => c.id !== commentId),
+          commentsCount: Math.max(0, (prev.commentsCount || 1) - 1),
+        }));
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to delete comment';
+      setActionError(msg);
+    }
+  };
+
+  const handleResolveReports = async (postId) => {
+    setActionError(null);
+    try {
+      await communityService.resolveReports(postId);
+      if (category === 'reported') {
+        setPosts((prev) => prev.filter((p) => p.id !== postId));
+      } else {
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postId ? { ...p, reportsCount: 0 } : p))
+        );
+      }
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost((prev) => ({ ...prev, reportsCount: 0 }));
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to resolve reports';
       setActionError(msg);
     }
   };
@@ -213,7 +326,7 @@ export default function CommunityFeed({ currentUser }) {
         <div className="flex items-center gap-1 self-start rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
           <button
             type="button"
-            onClick={() => setSort('trending')}
+            onClick={() => handleSortChange('trending')}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
               sort === 'trending'
                 ? 'bg-indigo-600 text-white shadow-xs'
@@ -225,7 +338,7 @@ export default function CommunityFeed({ currentUser }) {
           </button>
           <button
             type="button"
-            onClick={() => setSort('recent')}
+            onClick={() => handleSortChange('recent')}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
               sort === 'recent'
                 ? 'bg-indigo-600 text-white shadow-xs'
@@ -260,43 +373,63 @@ export default function CommunityFeed({ currentUser }) {
             </button>
           );
         })}
+
+        {/* Admin Moderation Queue Tab */}
+        {currentUser?.role === 'ADMIN' && (
+          <button
+            type="button"
+            onClick={() => setCategory('reported')}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all ${focusRing} ${
+              category === 'reported'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300'
+            }`}
+          >
+            <ShieldAlert className="size-3.5" />
+            <span>Reported Queue</span>
+          </button>
+        )}
       </div>
 
       {/* ── Feed Stream ─────────────────────────────────────────────────── */}
       <div className="space-y-4">
-        {loading ? (
+        {loading && posts.length === 0 ? (
           <Card>
             <SkeletonList rows={4} />
           </Card>
-        ) : error ? (
+        ) : error && posts.length === 0 ? (
           <Card>
             <ErrorState
               title="Could not load community discussions"
               message={error}
-              onRetry={loadPosts}
+              onRetry={() => loadPosts(true)}
             />
           </Card>
         ) : posts.length === 0 ? (
           <Card>
             <EmptyState
-              icon={Sparkles}
-              title="No posts found in this section"
+              icon={category === 'reported' ? ShieldAlert : Sparkles}
+              title={category === 'reported' ? 'Moderation queue is empty' : 'No posts found in this section'}
               description={
-                search
+                category === 'reported'
+                  ? 'All campus community posts are clear of flags. Great job keeping the community safe!'
+                  : search
                   ? `No community discussions matched "${search}". Try another keyword or create a new post.`
                   : 'Be the first to start a campus conversation, share an event, or report a facility issue!'
               }
             />
-            <div className="pb-6 text-center">
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(true)}
-                className={`inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 ${focusRing}`}
-              >
-                <Plus className="size-3.5" />
-                <span>Create New Post</span>
-              </button>
-            </div>
+            {category !== 'reported' && (
+              <div className="pb-6 text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(true)}
+                  className={`inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 ${focusRing}`}
+                >
+                  <Plus className="size-3.5" />
+                  <span>Create New Post</span>
+                </button>
+              </div>
+            )}
           </Card>
         ) : (
           posts.map((post) => (
@@ -309,6 +442,8 @@ export default function CommunityFeed({ currentUser }) {
               onOpenDetails={setSelectedPost}
               onStatusChange={handleStatusChange}
               onReport={handleReport}
+              onDelete={handleDeletePost}
+              onResolveReports={handleResolveReports}
             />
           ))
         )}
@@ -331,6 +466,9 @@ export default function CommunityFeed({ currentUser }) {
         onAddComment={handleAddComment}
         onStatusChange={handleStatusChange}
         onReport={handleReport}
+        onDeletePost={handleDeletePost}
+        onDeleteComment={handleDeleteComment}
+        onResolveReports={handleResolveReports}
       />
     </div>
   );

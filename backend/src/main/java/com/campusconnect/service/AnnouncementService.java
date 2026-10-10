@@ -12,8 +12,6 @@ import com.campusconnect.dto.CreateAnnouncementRequest;
 import com.campusconnect.dto.UpdateAnnouncementRequest;
 import com.campusconnect.entity.Announcement;
 import com.campusconnect.entity.Role;
-import com.campusconnect.entity.StudentProfile;
-import com.campusconnect.entity.TeacherProfile;
 import com.campusconnect.entity.User;
 import com.campusconnect.exception.BadRequestException;
 import com.campusconnect.exception.ResourceNotFoundException;
@@ -55,12 +53,12 @@ public class AnnouncementService {
             announcements = announcementRepository.searchForAdmin(cleanCategory, cleanSearch);
         } else if (user.getRole() == Role.TEACHER) {
             String department = teacherProfileRepository.findByUser(user)
-                    .map(TeacherProfile::getDepartment)
+                    .map(tp -> tp.getDepartment())
                     .orElse(null);
             announcements = announcementRepository.searchForTeacher(user.getId(), department, cleanCategory, cleanSearch);
         } else {
             String department = studentProfileRepository.findByUser(user)
-                    .map(StudentProfile::getDepartment)
+                    .map(sp -> sp.getDepartment())
                     .orElse(null);
             announcements = announcementRepository.searchForStudent(department, cleanCategory, cleanSearch);
         }

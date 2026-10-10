@@ -116,4 +116,44 @@ export const communityService = {
     const response = await api.post(`/community/posts/${postId}/report`);
     return response.data;
   },
+
+  /**
+   * Deletes a community post (Author or ADMIN).
+   */
+  async deletePost(postId) {
+    const response = await api.delete(`/community/posts/${postId}`);
+    return response.data;
+  },
+
+  /**
+   * Deletes a comment on a community post (Author or ADMIN).
+   */
+  async deleteComment(postId, commentId) {
+    const response = await api.delete(`/community/posts/${postId}/comments/${commentId}`);
+    return response.data;
+  },
+
+  /**
+   * Resolves/dismisses reported flags on a post (ADMIN only).
+   */
+  async resolveReports(postId) {
+    const response = await api.post(`/community/posts/${postId}/resolve-reports`);
+    return response.data;
+  },
+
+  /**
+   * Fetches posts with active reports for admin review (ADMIN only).
+   */
+  async getReportedPosts() {
+    const response = await api.get('/community/reported');
+    return response.data || [];
+  },
+
+  /**
+   * Fetches the moderation audit log (ADMIN only).
+   */
+  async getModerationLogs() {
+    const response = await api.get('/community/moderation-logs');
+    return response.data || [];
+  },
 };

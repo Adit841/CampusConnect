@@ -108,6 +108,10 @@ public class ChatWebSocketController {
             messagingTemplate.convertAndSend(
                     "/topic/conversations/" + conversation.getId(), saved);
 
+            for (String email : conversationService.getParticipantEmails(conversation.getId())) {
+                messagingTemplate.convertAndSendToUser(email, "/queue/messages", saved);
+            }
+
             log.debug("Message {} broadcast to /topic/conversations/{}", saved.id(), conversation.getId());
 
         } catch (org.springframework.security.access.AccessDeniedException ex) {

@@ -17,4 +17,9 @@ public interface CommunityReportRepository extends JpaRepository<CommunityReport
 
     @Query("SELECT CAST(r.user.id AS string) FROM CommunityReport r WHERE r.post.id = :postId")
     List<String> findReporterUserIdsByPostId(@Param("postId") Long postId);
+
+    @Query("SELECT r.post.id, CAST(r.user.id AS string) FROM CommunityReport r WHERE r.post.id IN :postIds")
+    List<Object[]> findReporterUserIdsByPostIds(@Param("postIds") java.util.Collection<Long> postIds);
+
+    void deleteByPostId(Long postId);
 }

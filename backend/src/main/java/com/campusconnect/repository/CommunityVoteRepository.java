@@ -22,4 +22,7 @@ public interface CommunityVoteRepository extends JpaRepository<CommunityVote, Lo
 
     @Query("SELECT CAST(v.user.id AS string) FROM CommunityVote v WHERE v.post.id = :postId")
     List<String> findVoterUserIdsByPostId(@Param("postId") Long postId);
+
+    @Query("SELECT v.post.id, CAST(v.user.id AS string) FROM CommunityVote v WHERE v.post.id IN :postIds")
+    List<Object[]> findVoterUserIdsByPostIds(@Param("postIds") java.util.Collection<Long> postIds);
 }

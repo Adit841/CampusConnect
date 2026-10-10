@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+
 import java.security.Principal;
 
 /**
@@ -26,10 +28,14 @@ public class MessageController {
 
     private final ConversationService conversationService;
     private final MessageService messageService;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public MessageController(ConversationService conversationService, MessageService messageService) {
+    public MessageController(ConversationService conversationService,
+                             MessageService messageService,
+                             SimpMessagingTemplate messagingTemplate) {
         this.conversationService = conversationService;
         this.messageService = messageService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -83,6 +89,16 @@ public class MessageController {
         Conversation conversation = conversationService.requireMembership(conversationId, principal.getName());
         User sender = conversationService.requireUser(principal.getName());
         MessageDto saved = messageService.send(conversation, sender, request);
+
+        try {
+            messagingTemplate.convertAndSend("/topic/conversations/" + conversation.getId(), saved);
+            for (String email : conversationService.getParticipantEmails(conversation.getId())) {
+                messagingTemplate.convertAndSendToUser(email, "/queue/messages", saved);
+            }
+        } catch (Exception ignored) {
+            // WS broadcast is best-effort for REST clients
+        }
+
         return ResponseEntity.ok(saved);
     }
 }

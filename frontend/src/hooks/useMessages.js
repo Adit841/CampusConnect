@@ -32,7 +32,7 @@ export function useMessages(conversationId) {
 
   // Fetch initial page when conversationId changes
   useEffect(() => {
-    if (conversationId == null) return;
+    if (conversationId == null || conversationId === 'undefined' || isNaN(Number(conversationId))) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -77,8 +77,12 @@ export function useMessages(conversationId) {
    */
   const appendMessage = useCallback((msg) => {
     setMessages((prev) => {
-      // Dedup by clientMsgId to handle WS delivery after optimistic append
-      const exists = prev.find((m) => m.clientMsgId === msg.clientMsgId);
+      // Dedup by clientMsgId or server id to prevent double delivery
+      const exists = prev.find(
+        (m) =>
+          (msg.clientMsgId && m.clientMsgId === msg.clientMsgId) ||
+          (msg.id && m.id > 0 && m.id === msg.id)
+      );
       if (exists) return prev;
       return [...prev, msg];
     });
@@ -86,31 +90,53 @@ export function useMessages(conversationId) {
 
   /**
    * Replaces an optimistic message (negative tempId) with the confirmed server message.
-   * Deduplication is by clientMsgId.
+   * Deduplication is by clientMsgId and server id.
    */
   const confirmMessage = useCallback((serverMsg) => {
     setMessages((prev) => {
-      const exists = prev.find((m) => m.id === serverMsg.id);
-      if (exists) return prev; // already confirmed (e.g. arrived via WS)
-      return prev.map((m) =>
-        m.clientMsgId === serverMsg.clientMsgId ? serverMsg : m
+      // If serverMsg already exists by exact server ID, do not duplicate
+      const alreadySaved = prev.find((m) => serverMsg.id && m.id === serverMsg.id);
+      if (alreadySaved) {
+        return prev;
+      }
+
+      // If an optimistic message with matching clientMsgId exists, update it
+      const matchIndex = prev.findIndex(
+        (m) => serverMsg.clientMsgId && m.clientMsgId === serverMsg.clientMsgId
       );
+      if (matchIndex !== -1) {
+        const next = [...prev];
+        next[matchIndex] = serverMsg;
+        return next;
+      }
+
+      // Otherwise, append the newly confirmed message
+      return [...prev, serverMsg];
     });
   }, []);
+
   const reload = useCallback(() => {
     if (conversationId == null) return;
-    setLoading(true);
     setError(null);
     getMessages(conversationId, 0)
       .then((pageData) => {
-        setMessages(pageData.content);
+        setMessages((prev) => {
+          const serverItems = pageData.content || [];
+          const serverClientIds = new Set(serverItems.map((m) => m.clientMsgId).filter(Boolean));
+          const serverIds = new Set(serverItems.map((m) => m.id).filter(Boolean));
+
+          // Retain pending messages that have not yet been confirmed by the server
+          const pending = prev.filter(
+            (m) => m._sending && m.id < 0 && !serverClientIds.has(m.clientMsgId) && !serverIds.has(m.id)
+          );
+          return [...serverItems, ...pending];
+        });
         setHasMore(!pageData.last);
         setPage(1);
       })
       .catch((err) => {
-        setError(err.response?.data?.detail || err.message || 'Failed to load messages');
-      })
-      .finally(() => setLoading(false));
+        setError(err.response?.data?.detail || err.message || 'Failed to reload messages');
+      });
   }, [conversationId]);
 
   return { messages, loading, error, hasMore, loadMore, appendMessage, confirmMessage, reload };

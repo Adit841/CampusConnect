@@ -42,12 +42,16 @@ class CommunityServiceTest {
     @Mock
     private StudentProfileRepository studentProfileRepo;
 
+    @Mock
+    private ModerationAuditLogRepository moderationAuditLogRepo;
+
     @InjectMocks
     private CommunityService communityService;
 
     private User student1;
     private User student2;
     private User faculty;
+    private User admin;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -59,6 +63,9 @@ class CommunityServiceTest {
 
         faculty = new User("Dr. Clark", "clark@campus.edu", "pass", Role.TEACHER);
         setId(faculty, 3L);
+
+        admin = new User("Admin Ayushman", "pathakaayushman57@gmail.com", "pass", Role.ADMIN);
+        setId(admin, 4L);
     }
 
     private void setId(Object entity, Long id) throws Exception {
@@ -173,5 +180,99 @@ class CommunityServiceTest {
 
         assertThatThrownBy(() -> communityService.updateStatus(104L, new UpdateStatusRequest("RESOLVED"), "alice@campus.edu"))
                 .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    @DisplayName("deletePost allows author to delete own post")
+    void testDeletePostAsAuthor() throws Exception {
+        CommunityPost post = new CommunityPost("My post", "Content", "general", "General", false, null, student1);
+        setId(post, 105L);
+
+        when(postRepo.findById(105L)).thenReturn(Optional.of(post));
+        when(userRepo.findByEmail("alice@campus.edu")).thenReturn(Optional.of(student1));
+
+        communityService.deletePost(105L, "alice@campus.edu");
+        verify(postRepo).delete(post);
+        verify(moderationAuditLogRepo, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("deletePost allows ADMIN to delete any post and records audit log")
+    void testDeletePostAsAdmin() throws Exception {
+        CommunityPost post = new CommunityPost("Inappropriate post", "Content", "general", "General", false, null, student1);
+        setId(post, 106L);
+
+        when(postRepo.findById(106L)).thenReturn(Optional.of(post));
+        when(userRepo.findByEmail("pathakaayushman57@gmail.com")).thenReturn(Optional.of(admin));
+
+        communityService.deletePost(106L, "pathakaayushman57@gmail.com");
+        verify(postRepo).delete(post);
+        verify(moderationAuditLogRepo).save(any());
+    }
+
+    @Test
+    @DisplayName("deletePost denies unauthorized students from deleting others' posts")
+    void testDeletePostUnauthorized() throws Exception {
+        CommunityPost post = new CommunityPost("Alice post", "Content", "general", "General", false, null, student1);
+        setId(post, 107L);
+
+        when(postRepo.findById(107L)).thenReturn(Optional.of(post));
+        when(userRepo.findByEmail("bob@campus.edu")).thenReturn(Optional.of(student2));
+
+        assertThatThrownBy(() -> communityService.deletePost(107L, "bob@campus.edu"))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(postRepo, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("resolveReports allows ADMIN to clear reports and records audit log")
+    void testResolveReportsAsAdmin() throws Exception {
+        CommunityPost post = new CommunityPost("Flagged post", "Content", "general", "General", false, null, student1);
+        setId(post, 108L);
+        post.setReportsCount(5);
+
+        when(postRepo.findById(108L)).thenReturn(Optional.of(post));
+        when(userRepo.findByEmail("pathakaayushman57@gmail.com")).thenReturn(Optional.of(admin));
+        when(postRepo.save(any(CommunityPost.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CommunityPostDto dto = communityService.resolveReports(108L, "pathakaayushman57@gmail.com");
+        assertThat(dto.reportsCount()).isEqualTo(0);
+        verify(reportRepo).deleteByPostId(108L);
+        verify(moderationAuditLogRepo).save(any());
+    }
+
+    @Test
+    @DisplayName("resolveReports denies non-admin users")
+    void testResolveReportsUnauthorized() throws Exception {
+        when(userRepo.findByEmail("bob@campus.edu")).thenReturn(Optional.of(student2));
+
+        assertThatThrownBy(() -> communityService.resolveReports(109L, "bob@campus.edu"))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(reportRepo, never()).deleteByPostId(any());
+    }
+
+    @Test
+    @DisplayName("getPosts with recent sort preserves newest post first (24 mins ago vs 1 hour ago)")
+    void testGetPostsChronologicalRecent() throws Exception {
+        java.time.Instant now = java.time.Instant.now();
+        CommunityPost post24MinAgo = new CommunityPost("Recent Post", "Content", "general", "General", false, null, student1);
+        setId(post24MinAgo, 201L);
+        java.lang.reflect.Field createdField = CommunityPost.class.getDeclaredField("createdAt");
+        createdField.setAccessible(true);
+        createdField.set(post24MinAgo, now.minusSeconds(24 * 60));
+
+        CommunityPost post1HourAgo = new CommunityPost("Older Post", "Content", "general", "General", false, null, student2);
+        setId(post1HourAgo, 202L);
+        createdField.set(post1HourAgo, now.minusSeconds(3600));
+
+        when(postRepo.findFilteredRecent(null, null)).thenReturn(java.util.List.of(post24MinAgo, post1HourAgo));
+        when(userRepo.findByEmail("alice@campus.edu")).thenReturn(Optional.of(student1));
+
+        java.util.List<CommunityPostDto> dtos = communityService.getPosts("all", "recent", null, "alice@campus.edu");
+
+        assertThat(dtos).hasSize(2);
+        assertThat(dtos.get(0).id()).isEqualTo(201L);
+        assertThat(dtos.get(1).id()).isEqualTo(202L);
+        assertThat(dtos.get(0).createdAt()).isAfter(dtos.get(1).createdAt());
     }
 }

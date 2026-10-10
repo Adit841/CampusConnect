@@ -117,4 +117,76 @@ public class CommunityController {
         CommunityPostDto updated = communityService.reportPost(id, principal.getName());
         return ResponseEntity.ok(updated);
     }
+
+    /**
+     * DELETE /api/community/posts/{id}
+     * Author or ADMIN can delete post.
+     */
+    @DeleteMapping("/posts/{id}")
+    public ResponseEntity<Void> deletePost(
+            @PathVariable Long id,
+            Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        communityService.deletePost(id, principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * DELETE /api/community/posts/{postId}/comments/{commentId}
+     * Author or ADMIN can delete comment.
+     */
+    @DeleteMapping("/posts/{postId}/comments/{commentId}")
+    public ResponseEntity<Void> deleteComment(
+            @PathVariable Long postId,
+            @PathVariable Long commentId,
+            Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        communityService.deleteComment(postId, commentId, principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * POST /api/community/posts/{id}/resolve-reports
+     * ADMIN only. Dismisses reports on post.
+     */
+    @PostMapping("/posts/{id}/resolve-reports")
+    public ResponseEntity<CommunityPostDto> resolveReports(
+            @PathVariable Long id,
+            Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        CommunityPostDto updated = communityService.resolveReports(id, principal.getName());
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * GET /api/community/reported
+     * ADMIN only. Returns list of reported posts.
+     */
+    @GetMapping("/reported")
+    public ResponseEntity<List<CommunityPostDto>> getReportedPosts(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        List<CommunityPostDto> reported = communityService.getReportedPosts(principal.getName());
+        return ResponseEntity.ok(reported);
+    }
+
+    /**
+     * GET /api/community/moderation-logs
+     * ADMIN only. Returns moderation audit trail.
+     */
+    @GetMapping("/moderation-logs")
+    public ResponseEntity<List<com.campusconnect.entity.ModerationAuditLog>> getModerationLogs(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        List<com.campusconnect.entity.ModerationAuditLog> logs = communityService.getModerationAuditLogs(principal.getName());
+        return ResponseEntity.ok(logs);
+    }
 }

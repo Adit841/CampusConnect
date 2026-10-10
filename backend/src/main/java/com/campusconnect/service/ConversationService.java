@@ -55,10 +55,15 @@ public class ConversationService {
         return conversations.stream()
                 .map(c -> toSummary(c, currentUser))
                 .sorted((a, b) -> {
-                    if (a.lastMessageAt() == null && b.lastMessageAt() == null) return 0;
-                    if (a.lastMessageAt() == null) return 1;
-                    if (b.lastMessageAt() == null) return -1;
-                    return b.lastMessageAt().compareTo(a.lastMessageAt());
+                    java.time.Instant timeA = a.lastMessageAt();
+                    java.time.Instant timeB = b.lastMessageAt();
+                    if (timeA == null && timeB == null) {
+                        return Long.compare(b.id(), a.id());
+                    }
+                    if (timeA == null) return 1;
+                    if (timeB == null) return -1;
+                    int cmp = timeB.compareTo(timeA);
+                    return cmp != 0 ? cmp : Long.compare(b.id(), a.id());
                 })
                 .toList();
     }
@@ -126,10 +131,20 @@ public class ConversationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<String> getParticipantEmails(Long conversationId) {
+        return participantRepo.findByConversationId(conversationId).stream()
+                .map(p -> p.getUser() != null ? p.getUser().getEmail() : null)
+                .filter(email -> email != null && !email.isBlank())
+                .toList();
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private Conversation createNew(User user1, User user2) {
         Conversation conversation = new Conversation();
+        conversation = conversationRepo.save(conversation);
+        conversation.setLastActivityAt(conversation.getCreatedAt());
         conversation = conversationRepo.save(conversation);
         ConversationParticipant p1 = new ConversationParticipant(conversation, user1);
         ConversationParticipant p2 = new ConversationParticipant(conversation, user2);
@@ -154,14 +169,15 @@ public class ConversationService {
                 .findFirst()
                 .orElse(currentUser); // edge case: fallback only if no other participant found
 
-        // Latest message preview (last page with 1 item)
+        // Latest message preview (last page with 1 item, deterministic tie-breaking by id)
         var messagePage = messageRepo.findByConversationId(
                 conversation.getId(), PageRequest.of(0, 1,
-                        org.springframework.data.domain.Sort.by("sentAt").descending()));
+                        org.springframework.data.domain.Sort.by("sentAt").descending()
+                                .and(org.springframework.data.domain.Sort.by("id").descending())));
         Message last = messagePage.isEmpty() ? null : messagePage.getContent().getFirst();
 
         String lastContent = last != null ? last.getContent() : null;
-        var lastAt = last != null ? last.getSentAt() : conversation.getCreatedAt();
+        var lastAt = last != null ? last.getSentAt() : conversation.getLastActivityAt();
         Long lastSenderId = last != null ? last.getSender().getId() : null;
 
         return new ConversationSummaryDto(

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { Users, MessagesSquare, Plus, Sparkles, AlertCircle } from 'lucide-react';
 import ConversationList from '../components/ConversationList.jsx';
@@ -8,6 +8,7 @@ import DevAuthModal from '../components/dev/DevAuthModal.jsx';
 import CommunityFeed from '../components/community/CommunityFeed.jsx';
 import { useConversations } from '../hooks/useConversations.js';
 import { usePresence } from '../hooks/usePresence.js';
+import { useChat } from '../hooks/useChat.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Card, focusRing } from '../components/ui/Card.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
@@ -24,7 +25,7 @@ export default function ChatPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') === 'messages' ? 'messages' : 'community';
 
-  const { conversations, loading, error, reload, startConversation, updateLastMessage } = useConversations();
+  const { conversations, loading, error, reload, startConversation, updateLastMessage, markAsRead } = useConversations(currentUser?.id);
   const [activeConversation, setActiveConversation] = useState(null);
   const [showPane, setShowPane] = useState(false); // mobile nav state for DM
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -37,12 +38,59 @@ export default function ChatPage() {
   );
   const { presenceMap, handlePresenceEvent, getStatus } = usePresence(participantIds);
 
+  const activeMessageListenerRef = useRef(null);
+  const activeReconnectListenerRef = useRef(null);
+  const activeConvIdRef = useRef(activeConversation?.id);
+  activeConvIdRef.current = activeConversation?.id;
+
+  const handleIncomingMessage = useCallback(
+    (msg) => {
+      if (!msg) return;
+      const isActive = activeConvIdRef.current === msg.conversationId;
+      updateLastMessage(msg.conversationId, msg.content, msg.sentAt, msg.senderId, isActive);
+      activeMessageListenerRef.current?.(msg);
+    },
+    [updateLastMessage]
+  );
+
+  const handleReconnect = useCallback(() => {
+    reload(true);
+    activeReconnectListenerRef.current?.();
+  }, [reload]);
+
+  const { connected, sendMessage, wsError } = useChat(
+    activeConversation?.id ?? null,
+    handleIncomingMessage,
+    handlePresenceEvent,
+    handleIncomingMessage,
+    handleReconnect
+  );
+
+  const registerActiveMessageListener = useCallback((fn) => {
+    activeMessageListenerRef.current = fn;
+    return () => {
+      if (activeMessageListenerRef.current === fn) {
+        activeMessageListenerRef.current = null;
+      }
+    };
+  }, []);
+
+  const registerReconnectListener = useCallback((fn) => {
+    activeReconnectListenerRef.current = fn;
+    return () => {
+      if (activeReconnectListenerRef.current === fn) {
+        activeReconnectListenerRef.current = null;
+      }
+    };
+  }, []);
+
   const handleTabChange = (tabKey) => {
     setSearchParams(tabKey === 'messages' ? { tab: 'messages' } : {});
   };
 
   const handleSelect = (conv) => {
     setActiveConversation(conv);
+    markAsRead?.(conv.id);
     setShowPane(true);
   };
 
@@ -54,9 +102,10 @@ export default function ChatPage() {
     async (targetUserId) => {
       const conv = await startConversation(targetUserId);
       setActiveConversation(conv);
+      markAsRead?.(conv.id);
       setShowPane(true);
     },
-    [startConversation]
+    [startConversation, markAsRead]
   );
 
   // ── Not logged in state ───────────────────────────────────────────────────
@@ -231,6 +280,11 @@ export default function ChatPage() {
                   onMessageActivity={updateLastMessage}
                   otherParticipantPresence={getStatus(activeConversation?.otherParticipantId)}
                   onPresenceEvent={handlePresenceEvent}
+                  connected={connected}
+                  sendMessage={sendMessage}
+                  wsError={wsError}
+                  registerActiveMessageListener={registerActiveMessageListener}
+                  registerReconnectListener={registerReconnectListener}
                 />
               </div>
             </div>
