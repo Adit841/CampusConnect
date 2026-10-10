@@ -1,15 +1,15 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { BookOpen, ClipboardList, LayoutGrid, PlugZap, SearchX } from 'lucide-react';
+import { BookOpen, ClipboardList, LayoutGrid, Plus, SearchX } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAsyncData } from '../hooks/useAsyncData.js';
 import {
   defaultFilters,
+  describeError,
   filterAssignments,
   loadAcademics,
   statusFilters,
   summarize,
-  withDerivedFields,
 } from '../services/academicsService.js';
 import { Card } from '../components/ui/Card.jsx';
 import { DataSourceBadge } from '../components/ui/Badge.jsx';
@@ -21,14 +21,21 @@ import SubjectCard from '../components/academics/SubjectCard.jsx';
 import AssignmentFilters from '../components/academics/AssignmentFilters.jsx';
 import AssignmentList from '../components/academics/AssignmentList.jsx';
 import AssignmentDetails from '../components/academics/AssignmentDetails.jsx';
-import TeacherToolsDialog from '../components/academics/TeacherToolsDialog.jsx';
+import AssignmentFormDialog from '../components/academics/AssignmentFormDialog.jsx';
+import SubjectFormDialog from '../components/academics/SubjectFormDialog.jsx';
+import SubmissionsReviewDialog from '../components/academics/SubmissionsReviewDialog.jsx';
 import { primaryButton, secondaryButton } from '../components/academics/buttonStyles.js';
 
 const TAB_IDS = ['overview', 'subjects', 'assignments'];
 const ID_PREFIX = 'academics';
 
-function PageHeader({ role, source, onPrimary, onSecondary }) {
-  const isTeacher = role === 'TEACHER';
+const descriptions = {
+  STUDENT: 'Your subjects, study materials and assignment deadlines in one place.',
+  TEACHER: 'Manage your subjects, publish assignments and review student submissions.',
+  ADMIN: 'Oversee subjects, teacher assignments and submission progress across the campus.',
+};
+
+function PageHeader({ role, source, canCreate, hasOwnSubjects, onNewSubject, onNewAssignment, onShowPending, onBrowseSubjects }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
@@ -38,22 +45,40 @@ function PageHeader({ role, source, onPrimary, onSecondary }) {
           </h1>
           <DataSourceBadge source={source} />
         </div>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          {isTeacher
-            ? 'Track the subjects you teach, assignment deadlines and submissions waiting for review.'
-            : 'Your subjects, study materials and assignment deadlines in one place.'}
-        </p>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{descriptions[role]}</p>
       </div>
-      {source === 'mock' && (
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <button type="button" onClick={onSecondary} className={secondaryButton}>
-            {isTeacher ? 'View assignments' : 'Browse subjects'}
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {role === 'STUDENT' && (
+          <>
+            <button type="button" onClick={onBrowseSubjects} className={secondaryButton}>Browse subjects</button>
+            <button type="button" onClick={onShowPending} className={primaryButton}>View pending work</button>
+          </>
+        )}
+        {role === 'TEACHER' && canCreate && (
+          <>
+            <button type="button" onClick={onNewSubject} className={secondaryButton}>
+              <Plus className="size-4" aria-hidden="true" />
+              New subject
+            </button>
+            <button
+              type="button"
+              onClick={onNewAssignment}
+              disabled={!hasOwnSubjects}
+              title={hasOwnSubjects ? undefined : 'Create a subject first'}
+              className={primaryButton}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              New assignment
+            </button>
+          </>
+        )}
+        {role === 'ADMIN' && canCreate && (
+          <button type="button" onClick={onNewSubject} className={primaryButton}>
+            <Plus className="size-4" aria-hidden="true" />
+            New subject
           </button>
-          <button type="button" onClick={onPrimary} className={primaryButton}>
-            {isTeacher ? 'Manage assignments' : 'View pending work'}
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -62,11 +87,20 @@ function PageHeader({ role, source, onPrimary, onSecondary }) {
 function AcademicsWorkspace({ role, isDemo }) {
   const loader = useCallback(() => loadAcademics(role, isDemo), [role, isDemo]);
   const { data, status, error, reload } = useAsyncData(loader);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState(defaultFilters);
-  const [demoSubmissions, setDemoSubmissions] = useState({});
-  const [selectedId, setSelectedId] = useState(null);
-  const [toolsOpen, setToolsOpen] = useState(false);
+  // { type: 'details' | 'submissions' | 'assignmentForm' | 'subjectForm', id?, subject?, subjectId? }
+  const [dialog, setDialog] = useState(null);
+
+  useEffect(() => {
+    if (!error) return undefined;
+    let active = true;
+    describeError(error).then((message) => active && setErrorMessage(message));
+    return () => {
+      active = false;
+    };
+  }, [error]);
 
   const requestedTab = searchParams.get('tab');
   const activeTab = TAB_IDS.includes(requestedTab) ? requestedTab : 'overview';
@@ -76,22 +110,27 @@ function AcademicsWorkspace({ role, isDemo }) {
   );
 
   const subjects = useMemo(() => data?.subjects ?? [], [data]);
-  const assignments = useMemo(
-    () => withDerivedFields(data?.assignments ?? [], subjects, role, demoSubmissions),
-    [data, subjects, role, demoSubmissions],
-  );
+  const assignments = useMemo(() => data?.assignments ?? [], [data]);
+  const ownSubjects = useMemo(() => subjects.filter((s) => s.canManage), [subjects]);
   const summary = useMemo(() => summarize(role, subjects, assignments), [role, subjects, assignments]);
   const visibleAssignments = useMemo(() => filterAssignments(assignments, filters), [assignments, filters]);
-  const selected = assignments.find((a) => a.id === selectedId) ?? null;
+  const dialogAssignment = dialog?.id != null ? assignments.find((a) => a.id === dialog.id) ?? null : null;
 
-  const loading = status === 'loading';
+  const initialLoading = status === 'loading' && !data;
   const source = data?.source;
+  const readOnly = source === 'mock';
+  const canCreate = !readOnly && source === 'api';
 
-  const onDemoSubmit = (assignmentId, fileName) =>
-    setDemoSubmissions((current) => ({ ...current, [assignmentId]: { fileName, at: new Date().toISOString() } }));
+  const openAssignment = (assignment) => setDialog({ type: 'details', id: assignment.id });
+  const closeDialog = () => setDialog(null);
 
   const showPending = () => {
     setFilters({ ...defaultFilters, status: 'PENDING' });
+    setTab('assignments');
+  };
+
+  const showSubjectAssignments = (subject) => {
+    setFilters({ ...defaultFilters, subjectId: String(subject.id) });
     setTab('assignments');
   };
 
@@ -99,8 +138,12 @@ function AcademicsWorkspace({ role, isDemo }) {
     <PageHeader
       role={role}
       source={source}
-      onPrimary={role === 'TEACHER' ? () => setToolsOpen(true) : showPending}
-      onSecondary={() => setTab(role === 'TEACHER' ? 'assignments' : 'subjects')}
+      canCreate={canCreate}
+      hasOwnSubjects={ownSubjects.length > 0}
+      onNewSubject={() => setDialog({ type: 'subjectForm' })}
+      onNewAssignment={() => setDialog({ type: 'assignmentForm' })}
+      onShowPending={showPending}
+      onBrowseSubjects={() => setTab('subjects')}
     />
   );
 
@@ -109,22 +152,7 @@ function AcademicsWorkspace({ role, isDemo }) {
       <div className="space-y-6">
         {header}
         <Card>
-          <ErrorState title="We couldn't load your academics" message={error?.message} onRetry={reload} />
-        </Card>
-      </div>
-    );
-  }
-
-  if (source === 'unavailable') {
-    return (
-      <div className="space-y-6">
-        {header}
-        <Card>
-          <EmptyState
-            icon={PlugZap}
-            title="Academics isn't connected yet"
-            description="Subjects and assignments will appear here once the Academics API is available."
-          />
+          <ErrorState title="We couldn't load your academics" message={errorMessage} onRetry={reload} />
         </Card>
       </div>
     );
@@ -132,14 +160,20 @@ function AcademicsWorkspace({ role, isDemo }) {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
-    { id: 'subjects', label: 'Subjects', icon: BookOpen, count: loading ? null : subjects.length },
-    { id: 'assignments', label: 'Assignments', icon: ClipboardList, count: loading ? null : assignments.length },
+    { id: 'subjects', label: 'Subjects', icon: BookOpen, count: initialLoading ? null : subjects.length },
+    { id: 'assignments', label: 'Assignments', icon: ClipboardList, count: initialLoading ? null : assignments.length },
   ];
+
+  const emptySubjectsText = {
+    STUDENT: 'No subjects match your department, course, year and section yet. Check that your profile is complete.',
+    TEACHER: 'Create a subject to start publishing assignments.',
+    ADMIN: 'No subjects have been created yet.',
+  };
 
   return (
     <div className="space-y-6">
       {header}
-      <AcademicSummary role={role} summary={loading ? null : summary} loading={loading} />
+      <AcademicSummary role={role} summary={initialLoading ? null : summary} loading={initialLoading} />
 
       <div>
         <AcademicsTabs tabs={tabs} activeTab={activeTab} onChange={setTab} idPrefix={ID_PREFIX} />
@@ -148,10 +182,11 @@ function AcademicsWorkspace({ role, isDemo }) {
           role="tabpanel"
           id={`${ID_PREFIX}-panel-${activeTab}`}
           aria-labelledby={`${ID_PREFIX}-tab-${activeTab}`}
+          aria-busy={status === 'loading'}
           tabIndex={0}
           className="pt-6 focus-visible:outline-none"
         >
-          {loading ? (
+          {initialLoading ? (
             <Card>
               <SkeletonList rows={4} />
             </Card>
@@ -161,13 +196,13 @@ function AcademicsWorkspace({ role, isDemo }) {
               subjects={subjects}
               assignments={assignments}
               source={source}
-              onOpen={(a) => setSelectedId(a.id)}
+              onOpen={openAssignment}
               onShowAll={() => setTab('assignments')}
             />
           ) : activeTab === 'subjects' ? (
             subjects.length === 0 ? (
               <Card>
-                <EmptyState icon={BookOpen} title="No subjects yet" description="Subjects you're enrolled in or teaching will appear here." />
+                <EmptyState icon={BookOpen} title="No subjects yet" description={emptySubjectsText[role]} />
               </Card>
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -175,7 +210,13 @@ function AcademicsWorkspace({ role, isDemo }) {
                   <SubjectCard
                     key={subject.id}
                     subject={subject}
-                    assignmentCount={assignments.filter((a) => a.subjectId === subject.id).length}
+                    onViewAssignments={showSubjectAssignments}
+                    onEdit={canCreate && subject.canManage ? (s) => setDialog({ type: 'subjectForm', subject: s }) : undefined}
+                    onCreateAssignment={
+                      canCreate && role === 'TEACHER' && subject.canManage
+                        ? (s) => setDialog({ type: 'assignmentForm', subjectId: s.id })
+                        : undefined
+                    }
                   />
                 ))}
               </div>
@@ -193,11 +234,15 @@ function AcademicsWorkspace({ role, isDemo }) {
               />
               <Card>
                 {assignments.length === 0 ? (
-                  <EmptyState icon={ClipboardList} title="No assignments yet" description="New assignments will appear here." />
+                  <EmptyState
+                    icon={ClipboardList}
+                    title="No assignments yet"
+                    description={role === 'TEACHER' ? 'Create an assignment for one of your subjects.' : 'New assignments will appear here once published.'}
+                  />
                 ) : visibleAssignments.length === 0 ? (
                   <EmptyState icon={SearchX} title="No matching assignments" description="Try a different search or clear the filters." />
                 ) : (
-                  <AssignmentList assignments={visibleAssignments} role={role} onOpen={(a) => setSelectedId(a.id)} />
+                  <AssignmentList assignments={visibleAssignments} role={role} onOpen={openAssignment} />
                 )}
               </Card>
             </div>
@@ -205,21 +250,60 @@ function AcademicsWorkspace({ role, isDemo }) {
         </div>
       </div>
 
-      {selected && (
+      {dialog?.type === 'details' && dialogAssignment && (
         <AssignmentDetails
-          assignment={selected}
+          assignment={dialogAssignment}
           role={role}
           source={source}
-          onClose={() => setSelectedId(null)}
-          onDemoSubmit={onDemoSubmit}
+          readOnly={readOnly}
+          onClose={closeDialog}
+          onChanged={reload}
+          onEdit={(a) => setDialog({ type: 'assignmentForm', id: a.id })}
+          onViewSubmissions={(a) => setDialog({ type: 'submissions', id: a.id })}
+          onDeleted={() => {
+            closeDialog();
+            reload();
+          }}
         />
       )}
-      {toolsOpen && <TeacherToolsDialog onClose={() => setToolsOpen(false)} />}
+
+      {dialog?.type === 'submissions' && dialogAssignment && (
+        <SubmissionsReviewDialog
+          assignment={dialogAssignment}
+          onClose={() => setDialog({ type: 'details', id: dialogAssignment.id })}
+          onChanged={reload}
+        />
+      )}
+
+      {dialog?.type === 'assignmentForm' && canCreate && (dialog.id == null || dialogAssignment) && (
+        <AssignmentFormDialog
+          assignment={dialogAssignment}
+          subjects={ownSubjects}
+          defaultSubjectId={dialog.subjectId}
+          onClose={() => setDialog(dialog.id != null ? { type: 'details', id: dialog.id } : null)}
+          onSaved={(saved, options) => {
+            reload();
+            if (!options?.keepOpen) setDialog({ type: 'details', id: saved.id });
+          }}
+        />
+      )}
+
+      {dialog?.type === 'subjectForm' && canCreate && (
+        <SubjectFormDialog
+          role={role}
+          subject={dialog.subject}
+          onClose={closeDialog}
+          onSaved={() => {
+            closeDialog();
+            reload();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-/** /academics — protected by RequireRole(['STUDENT', 'TEACHER']) in App.jsx. */
+/** /academics — protected by RequireRole(['STUDENT', 'TEACHER', 'ADMIN']) in App.jsx. */
 function AcademicsPage() {
   const { user, isDemo } = useAuth();
   return <AcademicsWorkspace key={`${user.role}-${isDemo}`} role={user.role} isDemo={isDemo} />;

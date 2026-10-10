@@ -6,7 +6,9 @@ import { focusRing } from './Card.jsx';
  * Accessible modal built on the native <dialog> element, which provides focus containment,
  * Escape-to-close and the backdrop. Render it conditionally or toggle `open`.
  */
-function Modal({ open, onClose, title, description, children, footer }) {
+const widths = { md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' };
+
+function Modal({ open, onClose, title, description, children, footer, size = 'md' }) {
   const ref = useRef(null);
   const titleId = useId();
 
@@ -23,7 +25,7 @@ function Modal({ open, onClose, title, description, children, footer }) {
       aria-labelledby={titleId}
       onClose={onClose}
       onClick={(event) => event.target === ref.current && onClose()}
-      className="m-auto w-[calc(100%-2rem)] max-w-xl rounded-xl border border-slate-200 bg-white p-0 text-slate-800 shadow-xl backdrop:bg-slate-900/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+      className={`m-auto w-[calc(100%-2rem)] ${widths[size] ?? widths.md} rounded-xl border border-slate-200 bg-white p-0 text-slate-800 shadow-xl backdrop:bg-slate-900/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200`}
     >
       <div className="flex max-h-[85dvh] flex-col">
         <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
