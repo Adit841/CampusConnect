@@ -19,7 +19,7 @@ export const navSections = [
   {
     label: 'Campus',
     items: [
-      { to: '/academics', label: 'Academics', icon: BookOpen, roles: ['STUDENT', 'TEACHER'] },
+      { to: '/academics', label: 'Academics', icon: BookOpen, roles: ['STUDENT', 'TEACHER', 'ADMIN'] },
       { to: '/announcements', label: 'Announcements', icon: Megaphone, roles: ['STUDENT', 'TEACHER', 'ADMIN'] },
       { to: '/clubs', label: 'Clubs & Events', icon: CalendarDays, roles: ['STUDENT', 'TEACHER', 'ADMIN'] },
       { to: '/chat', label: 'Community & Chat', icon: MessagesSquare, roles: ['STUDENT', 'TEACHER', 'ADMIN'] },
@@ -60,6 +60,7 @@ export const quickActions = {
     { to: '/profile', label: 'My profile', description: 'Department and office details', icon: UserRound },
   ],
   ADMIN: [
+    { to: '/academics', label: 'Academics oversight', description: 'Subjects, teachers and submission progress', icon: BookOpen },
     { to: '/announcements', label: 'Announcements', description: 'Platform-wide notices', icon: Megaphone },
     { to: '/clubs', label: 'Clubs & events', description: 'Campus activities overview', icon: CalendarDays },
     { to: '/chat', label: 'Community & Chat', description: 'Review feedback & campus discussions', icon: MessagesSquare },

@@ -29,6 +29,9 @@ build/
 *.jks
 *.p12
 
+# Academics uploads (local file storage)
+uploads/
+
 # Local secret properties
 *application-local.properties
 *application-secrets.properties

@@ -30,7 +30,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
 
-          <Route element={<RequireRole roles={['STUDENT', 'TEACHER']} />}>
+          <Route element={<RequireRole roles={['STUDENT', 'TEACHER', 'ADMIN']} />}>
             <Route path="/academics" element={<AcademicsPage />} />
           </Route>
 
