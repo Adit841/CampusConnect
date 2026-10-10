@@ -12,8 +12,6 @@ import com.campusconnect.dto.CreateAnnouncementRequest;
 import com.campusconnect.dto.UpdateAnnouncementRequest;
 import com.campusconnect.entity.Announcement;
 import com.campusconnect.entity.Role;
-import com.campusconnect.entity.StudentProfile;
-import com.campusconnect.entity.TeacherProfile;
 import com.campusconnect.entity.User;
 import com.campusconnect.exception.BadRequestException;
 import com.campusconnect.exception.ResourceNotFoundException;
