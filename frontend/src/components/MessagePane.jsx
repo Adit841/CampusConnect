@@ -10,7 +10,12 @@ import { formatMessageDate } from '../util/dateUtils.js';
 /**
  * Right-hand message pane — shows history and the composer for the selected conversation.
  */
-export default function MessagePane({ conversation, onMessageActivity }) {
+export default function MessagePane({
+  conversation,
+  onMessageActivity,
+  onPresenceEvent,
+  otherParticipantPresence = 'OFFLINE',
+}) {
   const { currentUser } = useAuth();
   const { messages, loading, error, hasMore, loadMore, appendMessage, confirmMessage, reload } = useMessages(
     conversation?.id ?? null
@@ -22,10 +27,14 @@ export default function MessagePane({ conversation, onMessageActivity }) {
   const handleIncoming = useCallback((msg) => {
     confirmMessage(msg);
     appendMessage(msg);
-    onMessageActivity?.(msg.conversationId, msg.content, msg.sentAt);
+    onMessageActivity?.(msg.conversationId, msg.content, msg.sentAt, msg.senderId);
   }, [appendMessage, confirmMessage, onMessageActivity]);
 
-  const { connected, sendMessage, wsError } = useChat(conversation?.id ?? null, handleIncoming);
+  const { connected, sendMessage, wsError } = useChat(
+    conversation?.id ?? null,
+    handleIncoming,
+    onPresenceEvent
+  );
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -49,7 +58,7 @@ export default function MessagePane({ conversation, onMessageActivity }) {
       _sending: true,
     };
     appendMessage(optimistic);
-    onMessageActivity?.(conversation.id, content, optimistic.sentAt);
+    onMessageActivity?.(conversation.id, content, optimistic.sentAt, currentUser?.id);
 
     try {
       const confirmed = await sendMessage(content, clientMsgId);
@@ -72,11 +81,11 @@ export default function MessagePane({ conversation, onMessageActivity }) {
       if (confirmed) {
         confirmMessage(confirmed);
       }
-      onMessageActivity?.(conversation.id, failedMsg.content, failedMsg.sentAt);
+      onMessageActivity?.(conversation.id, failedMsg.content, failedMsg.sentAt, currentUser?.id);
     } catch {
       confirmMessage({ ...failedMsg, _sending: false, _failed: true });
     }
-  }, [conversation, sendMessage, confirmMessage, onMessageActivity]);
+  }, [conversation, currentUser, sendMessage, confirmMessage, onMessageActivity]);
 
   // ── No conversation selected ──────────────────────────────────────────────
   if (!conversation) {
@@ -117,15 +126,28 @@ export default function MessagePane({ conversation, onMessageActivity }) {
         </div>
         <div>
           <p className="font-semibold text-slate-800 text-sm leading-tight">
-            {conversation.otherParticipantDisplayName}
+            {conversation.otherParticipantDisplayName || conversation.otherParticipantUsername}
           </p>
-          <p className="text-xs text-slate-500">@{conversation.otherParticipantUsername}</p>
+          <p className="text-xs text-slate-500">
+            {conversation.otherParticipantUsername?.includes('@')
+              ? conversation.otherParticipantUsername
+              : `@${conversation.otherParticipantUsername}`}
+          </p>
         </div>
 
-        {/* Connection status indicator */}
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-slate-300'} shrink-0`} />
-          <span className="text-xs text-slate-400">{connected ? 'Live' : 'Offline'}</span>
+        {/* Real Participant Online Presence */}
+        <div
+          className="ml-auto flex items-center gap-1.5"
+          title={`Participant status: ${otherParticipantPresence || 'Offline'}`}
+        >
+          <span
+            className={`w-2 h-2 rounded-full ${
+              otherParticipantPresence === 'ONLINE' ? 'bg-emerald-500 shadow-xs' : 'bg-slate-300'
+            } shrink-0`}
+          />
+          <span className="text-xs font-medium text-slate-500">
+            {otherParticipantPresence === 'ONLINE' ? 'Online' : 'Offline'}
+          </span>
         </div>
       </div>
 

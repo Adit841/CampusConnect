@@ -15,6 +15,7 @@ import java.time.Instant;
  * @param lastMessageContent  Preview of the most recent message, or {@code null} if no messages.
  * @param lastMessageAt       Timestamp of the most recent message, or conversation creation time if empty.
  * @param unreadCount         Future use — always 0 for now.
+ * @param lastMessageSenderId User ID of the sender of the most recent message, or {@code null} if empty.
  */
 public record ConversationSummaryDto(
         Long id,
@@ -23,5 +24,18 @@ public record ConversationSummaryDto(
         String otherParticipantDisplayName,
         String lastMessageContent,
         Instant lastMessageAt,
-        int unreadCount
-) {}
+        int unreadCount,
+        Long lastMessageSenderId
+) {
+    public ConversationSummaryDto(
+            Long id,
+            Long otherParticipantId,
+            String otherParticipantUsername,
+            String otherParticipantDisplayName,
+            String lastMessageContent,
+            Instant lastMessageAt,
+            int unreadCount
+    ) {
+        this(id, otherParticipantId, otherParticipantUsername, otherParticipantDisplayName, lastMessageContent, lastMessageAt, unreadCount, null);
+    }
+}

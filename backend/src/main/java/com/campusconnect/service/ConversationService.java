@@ -130,19 +130,29 @@ public class ConversationService {
 
     private Conversation createNew(User user1, User user2) {
         Conversation conversation = new Conversation();
-        conversationRepo.save(conversation);
-        participantRepo.save(new ConversationParticipant(conversation, user1));
-        participantRepo.save(new ConversationParticipant(conversation, user2));
+        conversation = conversationRepo.save(conversation);
+        ConversationParticipant p1 = new ConversationParticipant(conversation, user1);
+        ConversationParticipant p2 = new ConversationParticipant(conversation, user2);
+        p1 = participantRepo.save(p1);
+        p2 = participantRepo.save(p2);
+        conversation.getParticipants().add(p1);
+        conversation.getParticipants().add(p2);
         return conversation;
     }
 
     private ConversationSummaryDto toSummary(Conversation conversation, User currentUser) {
+        // Resolve participants, falling back to direct repository lookup if collection uninitialized or empty
+        List<ConversationParticipant> participants = conversation.getParticipants();
+        if (participants == null || participants.isEmpty()) {
+            participants = participantRepo.findByConversationId(conversation.getId());
+        }
+
         // Find the other participant
-        User other = conversation.getParticipants().stream()
+        User other = participants.stream()
                 .map(ConversationParticipant::getUser)
                 .filter(u -> !u.getId().equals(currentUser.getId()))
                 .findFirst()
-                .orElse(currentUser); // edge case: only one participant (should not happen)
+                .orElse(currentUser); // edge case: fallback only if no other participant found
 
         // Latest message preview (last page with 1 item)
         var messagePage = messageRepo.findByConversationId(
@@ -152,6 +162,7 @@ public class ConversationService {
 
         String lastContent = last != null ? last.getContent() : null;
         var lastAt = last != null ? last.getSentAt() : conversation.getCreatedAt();
+        Long lastSenderId = last != null ? last.getSender().getId() : null;
 
         return new ConversationSummaryDto(
                 conversation.getId(),
@@ -160,7 +171,8 @@ public class ConversationService {
                 other.getName(),
                 lastContent,
                 lastAt,
-                0 // unread count — future work
+                0,
+                lastSenderId
         );
     }
 }

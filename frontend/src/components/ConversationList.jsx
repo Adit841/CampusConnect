@@ -11,6 +11,8 @@ export default function ConversationList({
   onSelect,
   onRetry,
   onNewChat,
+  currentUserId,
+  presenceMap = {},
 }) {
   return (
     <aside
@@ -92,6 +94,8 @@ export default function ConversationList({
               conversation={conv}
               isActive={conv.id === activeId}
               onClick={() => onSelect(conv)}
+              currentUserId={currentUserId}
+              isOnline={presenceMap[conv.otherParticipantId] === 'ONLINE'}
             />
           </div>
         ))}

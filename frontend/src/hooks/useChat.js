@@ -17,16 +17,18 @@ const WS_URL = import.meta.env.VITE_WS_BASE_URL || 'http://localhost:8080/ws/soc
  *   wsError: string|null
  * }}
  */
-export function useChat(conversationId, onMessage) {
+export function useChat(conversationId, onMessage, onPresence) {
   const { currentUser, token } = useAuth();
   const [connected, setConnected] = useState(false);
   const [wsError, setWsError] = useState(null);
   const clientRef = useRef(null);
   const subscriptionRef = useRef(null);
   const onMessageRef = useRef(onMessage);
+  const onPresenceRef = useRef(onPresence);
 
-  // Keep onMessage ref current without triggering reconnects
+  // Keep callback refs current without triggering reconnects
   useEffect(() => { onMessageRef.current = onMessage; }, [onMessage]);
+  useEffect(() => { onPresenceRef.current = onPresence; }, [onPresence]);
 
   // ── Connect / disconnect lifecycle ────────────────────────────────────────
   useEffect(() => {
@@ -47,6 +49,16 @@ export function useChat(conversationId, onMessage) {
             setWsError(payload.error || 'Server error');
           } catch {
             setWsError('Server error');
+          }
+        });
+
+        // Subscribe to server-wide user online presence events
+        client.subscribe('/topic/presence', (frame) => {
+          try {
+            const payload = JSON.parse(frame.body);
+            onPresenceRef.current?.(payload);
+          } catch {
+            // ignore
           }
         });
       },
