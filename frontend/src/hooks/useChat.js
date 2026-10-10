@@ -3,8 +3,8 @@ import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { sendMessageRest } from '../services/chatApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
-
-const WS_URL = import.meta.env.VITE_WS_BASE_URL || 'http://localhost:8080/ws/sockjs';
+const defaultWsUrl = import.meta.env.DEV ? '/ws/sockjs' : 'http://localhost:8080/ws/sockjs';
+const WS_URL = import.meta.env.VITE_WS_BASE_URL || defaultWsUrl;
 
 /**
  * Hook that manages the STOMP WebSocket connection and real-time message delivery.

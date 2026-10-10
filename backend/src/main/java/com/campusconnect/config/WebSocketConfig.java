@@ -54,10 +54,20 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        String[] origins = allowedOrigins == null ? new String[0] : allowedOrigins.stream()
-                .filter(origin -> origin != null && !origin.isBlank())
-                .map(origin -> origin.trim())
-                .toArray(String[]::new);
+        List<String> originList = new java.util.ArrayList<>();
+        if (allowedOrigins != null) {
+            allowedOrigins.stream()
+                    .filter(origin -> origin != null && !origin.isBlank())
+                    .map(origin -> origin.trim())
+                    .forEach(originList::add);
+        }
+        if (!originList.contains("http://localhost:*")) {
+            originList.add("http://localhost:*");
+        }
+        if (!originList.contains("http://127.0.0.1:*")) {
+            originList.add("http://127.0.0.1:*");
+        }
+        String[] origins = originList.toArray(String[]::new);
 
         // Native WebSocket endpoint
         registry.addEndpoint("/ws")
