@@ -34,10 +34,6 @@ public class MessageService {
         this.messageRepo = messageRepo;
     }
 
-    public MessageService(MessageRepository messageRepo, ConversationService conversationService) {
-        this(messageRepo);
-    }
-
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**

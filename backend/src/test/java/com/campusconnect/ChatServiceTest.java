@@ -61,7 +61,7 @@ class ChatServiceTest {
     void setUp() {
         conversationService = new ConversationService(
                 conversationRepo, participantRepo, userRepo, messageRepo);
-        messageService = new MessageService(messageRepo, conversationService);
+        messageService = new MessageService(messageRepo);
 
         alice = new User("Alice Smith", "alice@test.com", "password", com.campusconnect.entity.Role.STUDENT);
         alice.setId(1L);
