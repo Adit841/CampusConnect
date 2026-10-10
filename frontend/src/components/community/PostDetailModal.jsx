@@ -46,17 +46,11 @@ export default function PostDetailModal({
   const isAuthor = String(post.author?.id) === String(currentUserId);
   const canManageStatus = isAuthor || currentUser?.role === 'TEACHER' || currentUser?.role === 'ADMIN';
 
-  const handleCommentSubmit = (e) => {
+  const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
 
-    onAddComment(post.id, {
-      author: {
-        id: currentUser?.id,
-        name: currentUser?.name || 'Campus Student',
-        role: currentUser?.role || 'STUDENT',
-        initials: currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'ME',
-      },
+    await onAddComment(post.id, {
       text: commentText.trim(),
     });
     setCommentText('');
