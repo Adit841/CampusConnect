@@ -29,11 +29,9 @@ public class MessageService {
     public static final int PAGE_SIZE = 50;
 
     private final MessageRepository messageRepo;
-    private final ConversationService conversationService;
 
-    public MessageService(MessageRepository messageRepo, ConversationService conversationService) {
+    public MessageService(MessageRepository messageRepo) {
         this.messageRepo = messageRepo;
-        this.conversationService = conversationService;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────

@@ -20,11 +20,19 @@ public class CorsConfig {
         CorsConfiguration config = new CorsConfiguration();
         
         List<String> cleanOrigins = allowedOrigins == null ? List.of() : allowedOrigins.stream()
-                .map(String::trim)
-                .filter(origin -> !origin.isEmpty())
+                .filter(origin -> origin != null && !origin.isBlank())
+                .map(origin -> origin.trim())
                 .toList();
 
-        config.setAllowedOrigins(cleanOrigins);
+        List<String> originPatterns = new java.util.ArrayList<>(cleanOrigins);
+        if (!originPatterns.contains("http://localhost:*")) {
+            originPatterns.add("http://localhost:*");
+        }
+        if (!originPatterns.contains("http://127.0.0.1:*")) {
+            originPatterns.add("http://127.0.0.1:*");
+        }
+
+        config.setAllowedOriginPatterns(originPatterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));

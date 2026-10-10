@@ -3,7 +3,6 @@ package com.campusconnect.controller;
 import com.campusconnect.dto.ChatUserDto;
 import com.campusconnect.dto.ConversationSummaryDto;
 import com.campusconnect.dto.CreateConversationRequest;
-import com.campusconnect.entity.Role;
 import com.campusconnect.exception.GlobalExceptionHandler;
 import com.campusconnect.service.ConversationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
