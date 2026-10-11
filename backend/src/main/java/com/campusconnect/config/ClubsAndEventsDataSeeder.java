@@ -42,12 +42,7 @@ public class ClubsAndEventsDataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (clubRepo.count() > 0) {
-            log.info("Clubs directory already initialized ({} clubs found). Skipping seed.", clubRepo.count());
-            return;
-        }
-
-        log.info("Seeding initial authentic college clubs directory and sample campus events...");
+        boolean freshDirectory = clubRepo.count() == 0;
 
         User adminUser = userRepo.findByRole(Role.ADMIN).stream().findFirst().orElse(null);
         if (adminUser == null) {
@@ -58,8 +53,26 @@ public class ClubsAndEventsDataSeeder implements CommandLineRunner {
             return;
         }
 
-        // ── 1. Seed Clubs ────────────────────────────────────────────────────────
-        List<Club> clubs = List.of(
+        // ── 1. Seed Clubs (any club missing by slug or name is added, existing ones are left untouched) ──
+        List<Club> missingClubs = defaultClubs(adminUser).stream()
+                .filter(club -> !clubRepo.existsBySlug(club.getSlug())
+                        && !clubRepo.existsByNameIgnoreCase(club.getName()))
+                .toList();
+        if (!missingClubs.isEmpty()) {
+            clubRepo.saveAll(missingClubs);
+            log.info("Seeded {} college clubs.", missingClubs.size());
+        }
+
+        if (!freshDirectory) {
+            log.info("Clubs directory already initialized. Skipping sample events seed.");
+            return;
+        }
+
+        seedSampleEvents(adminUser);
+    }
+
+    private List<Club> defaultClubs(User adminUser) {
+        return List.of(
             // Technical
             createClub("Arya Cipher Coding Club", "arya-cipher-coding-club", ClubCategory.TECHNICAL,
                 "Algorithmic challenges, competitive programming, and open-source software.",
@@ -97,6 +110,36 @@ public class ClubsAndEventsDataSeeder implements CommandLineRunner {
                 "• PLC and SCADA automation fundamentals\n• Smart campus sensor mesh prototypes\n• Home automation mini-projects\n• Industrial site visit exposures",
                 adminUser),
 
+            createClub("Arya Intelverse Club", "arya-intelverse-club", ClubCategory.TECHNICAL,
+                "Design, Develop, Connect — Internet of Things innovation.",
+                "Arya's IoT innovation club, bridging the physical and digital worlds. Members design smart solutions with sensors, microcontrollers, cloud platforms, and AI for healthcare, agriculture, transportation, and smart homes.",
+                "• IoT fundamentals, hardware interfacing, and programming workshops\n• IoT hackathons and innovation challenges\n• Mentored sensor + cloud + AI prototype builds\n• Project showcases at exhibitions and competitions",
+                adminUser),
+
+            createClub("Arya Go-Kart Club", "arya-go-kart-club", ClubCategory.TECHNICAL,
+                "Illuminate | Educate | Entertain — go-kart design, fabrication, and racing.",
+                "For motorsport enthusiasts who want to build and race. Members learn go-kart design, CAD modelling, fabrication, engines, chassis design, aerodynamics, and safety systems, then test their machines on track.",
+                "• Go-kart design and fabrication workshops\n• AutoCAD learning workshop and Arena design competition\n• Driving and track testing sessions\n• Seminars with alumni racers",
+                adminUser),
+
+            createClub("Arya Green Energy Club", "arya-green-energy-club", ClubCategory.TECHNICAL,
+                "Empower, Innovate, Sustain! — renewable energy and green technology.",
+                "A platform to learn, innovate, and engage in sustainable energy. Members build small-scale renewable energy models, explore green technology, and drive energy-conservation awareness on campus.",
+                "• Solar charger, wind turbine, and sustainable water system builds\n• Expert talks on renewable energy and green technology\n• Field trips to solar plants, wind farms, and green buildings\n• Energy conservation campaigns and green innovation contests",
+                adminUser),
+
+            createClub("Arya Skill Development Club", "arya-skill-development-club", ClubCategory.TECHNICAL,
+                "Hands-on electronics and communication skills for industry readiness.",
+                "Focused on practical skills that complement academic learning in electronics, communication, and allied areas, making students industry-ready through monthly hands-on workshops in the Skill Development Lab.",
+                "• Monthly workshops on circuit design, embedded systems, and IoT\n• Python, MATLAB, circuit simulation, and PCB design training\n• Student project showcase technical events\n• Guest lectures with industry experts",
+                adminUser),
+
+            createClub("Arya Science & Technology Club", "arya-science-and-technology-club", ClubCategory.TECHNICAL,
+                "Imagine, Invent, Inspire.",
+                "A one-stop destination for innovative and creative minds. The club fosters innovation, creativity, and entrepreneurship, helping students turn ideas into impactful solutions through hands-on, real-world challenges.",
+                "• IDEA-THON: idea submission, PPT creation, and live pitch rounds\n• Innovation and problem-solving challenges\n• Project showcases with rewards and trophies\n• Collaborative tech and entrepreneurship sessions",
+                adminUser),
+
             // Cultural & Arts
             createClub("Arya Music Club", "arya-music-club", ClubCategory.CULTURAL,
                 "Acoustic melodies, classical ragas, vocal harmonies, and rock bands.",
@@ -126,6 +169,12 @@ public class ClubsAndEventsDataSeeder implements CommandLineRunner {
                 "Debates, poetry slams, book discussions, and creative writing.",
                 "For bibliophiles, poets, and debaters. We host parliamentary debates, creative writing challenges, and publish the annual student literary magazine.",
                 "• Bi-weekly poetry open-mics (Kavyanjali)\n• Parliamentary and Oxford-style debates\n• Creative short-story writing contests\n• Campus book exchanges and reviews",
+                adminUser),
+
+            createClub("Arya Movie Club", "arya-movie-club", ClubCategory.CULTURAL,
+                "Illuminate | Educate | Entertain — cinema, short films, and storytelling.",
+                "A space to explore the world of cinema. Members discuss films across genres, learn scriptwriting and filmmaking, and create and screen their own short films.",
+                "• Short film screening competitions\n• Filmmaking, scriptwriting, and film analysis workshops\n• Film appreciation and critique sessions\n• Student short film showcases",
                 adminUser),
 
             // Sports
@@ -159,6 +208,18 @@ public class ClubsAndEventsDataSeeder implements CommandLineRunner {
                 "• Inter-department Valorant and CS championships\n• BGMI mobile tournament weekends\n• Game strategy, shoutcasting, and stream management\n• Responsible gaming and balance seminars",
                 adminUser),
 
+            createClub("Arya Badminton Club", "arya-badminton-club", ClubCategory.SPORTS,
+                "Swing with Passion, Play with Pride!",
+                "Promoting athleticism, teamwork, and a passion for badminton. Regular court practice, skill and fitness training, and tournaments that prepare players for inter-college competitions.",
+                "• Daily court practice sessions\n• Saturday mini tournaments\n• Monthly major tournaments\n• Technique, fitness, and tactics coaching",
+                adminUser),
+
+            createClub("Arya Table Tennis Club", "arya-table-tennis-club", ClubCategory.SPORTS,
+                "Ping Pong Passion, Play to Perfection.",
+                "A fun, welcoming space for players of every level to enjoy and improve at table tennis through regular practice, coaching, friendly matches, and competitive tournaments.",
+                "• Regular practice sessions\n• Coaching to refine technique\n• Friendly matches\n• Annual intra-college tournament",
+                adminUser),
+
             // Social & Community
             createClub("Arya Social Activities Club", "arya-social-activities-club", ClubCategory.SOCIAL,
                 "Community outreach, literacy programs, and campus social initiatives.",
@@ -172,10 +233,9 @@ public class ClubsAndEventsDataSeeder implements CommandLineRunner {
                 "• Campus tree plantation drives\n• Plastic-free campus campaigns and recycling bins\n• Solar energy workshops and green audit walks\n• World Environment Day eco-exhibitions",
                 adminUser)
         );
+    }
 
-        clubRepo.saveAll(clubs);
-        log.info("Successfully seeded {} authentic college clubs.", clubs.size());
-
+    private void seedSampleEvents(User adminUser) {
         // ── 2. Seed Events ───────────────────────────────────────────────────────
         Club codingClub = clubRepo.findBySlug("arya-cipher-coding-club").orElse(null);
         Club gdgClub = clubRepo.findBySlug("arya-gdg-club").orElse(null);
