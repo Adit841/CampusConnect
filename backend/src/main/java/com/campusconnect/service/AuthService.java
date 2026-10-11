@@ -35,6 +35,9 @@ public class AuthService {
     private final TeacherProfileRepository teacherProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    /** The only college users can register under for now. */
+    public static final String COLLEGE = "Arya College of Engineering & IT";
+
     private final AuthenticationManager authenticationManager;
 
     public AuthService(
@@ -65,6 +68,10 @@ public class AuthService {
             throw new BadRequestException("Only STUDENT and TEACHER registrations are allowed");
         }
 
+        if (request.getCollege() == null || !COLLEGE.equalsIgnoreCase(request.getCollege().trim())) {
+            throw new BadRequestException("Please select a valid college");
+        }
+
         // Prevent duplicate email
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("Email is already registered: " + request.getEmail());
@@ -93,6 +100,7 @@ public class AuthService {
         user.setEmail(request.getEmail().trim().toLowerCase());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(request.getRole());
+        user.setCollege(COLLEGE);
         user.setPhone(request.getPhone());
         user.setBio(request.getBio());
         user.setProfileImage(request.getProfileImage());

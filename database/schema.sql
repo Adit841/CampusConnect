@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
     email         VARCHAR(255) NOT NULL,
     password      VARCHAR(255) NOT NULL,
     role          VARCHAR(50)  NOT NULL,
+    college       VARCHAR(255) DEFAULT NULL,
     profile_image VARCHAR(255) DEFAULT NULL,
     phone         VARCHAR(255) DEFAULT NULL,
     bio           TEXT         DEFAULT NULL,

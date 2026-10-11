@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import {
   AlertCircle,
   BookOpen,
+  Building2,
   Eye,
   EyeOff,
   GraduationCap,
@@ -15,6 +16,8 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { extractAuthError, registerUser } from '../../services/authService.js';
 import { Card, focusRing } from '../../components/ui/Card.jsx';
 
+const COLLEGE = 'Arya College of Engineering & IT';
+
 function RegisterPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
@@ -26,6 +29,7 @@ function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState({});
 
   const [formData, setFormData] = useState({
+    college: COLLEGE,
     name: '',
     email: '',
     password: '',
@@ -99,6 +103,7 @@ function RegisterPage() {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         role,
+        college: formData.college,
         phone: formData.phone.trim() || null,
         bio: formData.bio.trim() || null,
       };
@@ -197,6 +202,35 @@ function RegisterPage() {
           <form onSubmit={handleSubmit} noValidate className="space-y-5">
             {/* Account Details */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label htmlFor="college" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  College <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative mt-1.5">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <Building2 className="size-4" aria-hidden="true" />
+                  </div>
+                  <select
+                    id="college"
+                    name="college"
+                    required
+                    disabled={loading}
+                    value={formData.college}
+                    onChange={handleChange}
+                    className={`block w-full rounded-lg border bg-white py-2 pl-9 pr-3 text-sm text-slate-900 dark:bg-slate-900 dark:text-slate-100 ${
+                      fieldErrors.college
+                        ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
+                        : 'border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:hover:border-slate-600'
+                    } ${focusRing}`}
+                  >
+                    <option value={COLLEGE}>{COLLEGE}</option>
+                  </select>
+                </div>
+                {fieldErrors.college && (
+                  <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">{fieldErrors.college}</p>
+                )}
+              </div>
+
               <div className="sm:col-span-2">
                 <label htmlFor="name" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Full Name <span className="text-rose-500">*</span>
