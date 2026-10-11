@@ -1,6 +1,0 @@
-target/
-uploads/
-bin/
-.env
-.env.*
-!.env.example

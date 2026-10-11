@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/dist
+**/target
+**/uploads
+backend/bin
+**/.env
+**/.env.*
+!**/.env.example
