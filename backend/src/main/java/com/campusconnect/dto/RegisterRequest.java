@@ -23,6 +23,9 @@ public class RegisterRequest {
     @NotNull(message = "Role is required")
     private Role role;
 
+    @NotBlank(message = "College is required")
+    private String college;
+
     private String profileImage;
     private String phone;
     private String bio;
@@ -73,6 +76,14 @@ public class RegisterRequest {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public String getCollege() {
+        return college;
+    }
+
+    public void setCollege(String college) {
+        this.college = college;
     }
 
     public String getProfileImage() {

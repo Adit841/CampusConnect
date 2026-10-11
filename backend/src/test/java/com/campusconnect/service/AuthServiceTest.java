@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,6 +54,8 @@ class AuthServiceTest {
     @Mock
     private AuthenticationManager authenticationManager;
 
+    private static final String ARYA = "Arya College of Engineering & IT";
+
     private AuthService authService;
 
     @BeforeEach
@@ -74,6 +77,7 @@ class AuthServiceTest {
         request.setEmail("john@example.com");
         request.setPassword("plainPassword123");
         request.setRole(Role.STUDENT);
+        request.setCollege(ARYA);
         request.setEnrollmentNo("EN12345");
         request.setRollNo("CS-01");
         request.setCourse("B.Tech");
@@ -84,10 +88,11 @@ class AuthServiceTest {
         when(userRepository.existsByEmail("john@example.com")).thenReturn(false);
         when(studentProfileRepository.existsByEnrollmentNo("EN12345")).thenReturn(false);
         when(passwordEncoder.encode("plainPassword123")).thenReturn("hashedPassword123");
-
-        User savedUser = new User("John Doe", "john@example.com", "hashedPassword123", Role.STUDENT);
-        savedUser.setId(10L);
-        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User saved = invocation.getArgument(0);
+            saved.setId(10L);
+            return saved;
+        });
         when(jwtService.generateToken(any(), any())).thenReturn("mock.jwt.token");
 
         AuthResponse response = authService.register(request);
@@ -96,7 +101,53 @@ class AuthServiceTest {
         assertEquals("mock.jwt.token", response.getToken());
         assertEquals("john@example.com", response.getUser().getEmail());
         assertEquals(Role.STUDENT, response.getUser().getRole());
+        assertEquals(ARYA, response.getUser().getCollege());
         verify(studentProfileRepository).save(any(StudentProfile.class));
+    }
+
+    @Test
+    void testRegisterNormalizesCollegeToConfiguredName() {
+        RegisterRequest request = new RegisterRequest();
+        request.setName("Jane Doe");
+        request.setEmail("jane@example.com");
+        request.setPassword("plainPassword123");
+        request.setRole(Role.STUDENT);
+        request.setCollege("  arya college of engineering & it  ");
+        request.setEnrollmentNo("EN54321");
+
+        when(userRepository.existsByEmail("jane@example.com")).thenReturn(false);
+        when(studentProfileRepository.existsByEnrollmentNo("EN54321")).thenReturn(false);
+        when(passwordEncoder.encode("plainPassword123")).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtService.generateToken(any(), any())).thenReturn("token");
+
+        AuthResponse response = authService.register(request);
+
+        assertEquals(ARYA, response.getUser().getCollege());
+    }
+
+    @Test
+    void testRegisterUnknownCollegeThrowsBadRequest() {
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail("someone@example.com");
+        request.setRole(Role.STUDENT);
+        request.setCollege("Some Other College");
+        request.setEnrollmentNo("EN777");
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> authService.register(request));
+        assertEquals("Please select a valid college", ex.getMessage());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void testRegisterMissingCollegeThrowsBadRequest() {
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail("someone@example.com");
+        request.setRole(Role.TEACHER);
+        request.setEmployeeId("EMP777");
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> authService.register(request));
+        assertEquals("Please select a valid college", ex.getMessage());
     }
 
     @Test
@@ -106,6 +157,7 @@ class AuthServiceTest {
         request.setEmail("smith@example.com");
         request.setPassword("teachPass123");
         request.setRole(Role.TEACHER);
+        request.setCollege(ARYA);
         request.setEmployeeId("EMP999");
         request.setDepartment("Physics");
         request.setDesignation("Assistant Professor");
@@ -115,9 +167,11 @@ class AuthServiceTest {
         when(teacherProfileRepository.existsByEmployeeId("EMP999")).thenReturn(false);
         when(passwordEncoder.encode("teachPass123")).thenReturn("hashedTeachPass");
 
-        User savedUser = new User("Prof. Smith", "smith@example.com", "hashedTeachPass", Role.TEACHER);
-        savedUser.setId(11L);
-        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User saved = invocation.getArgument(0);
+            saved.setId(11L);
+            return saved;
+        });
         when(jwtService.generateToken(any(), any())).thenReturn("mock.teacher.jwt");
 
         AuthResponse response = authService.register(request);
@@ -126,6 +180,7 @@ class AuthServiceTest {
         assertEquals("mock.teacher.jwt", response.getToken());
         assertEquals("smith@example.com", response.getUser().getEmail());
         assertEquals(Role.TEACHER, response.getUser().getRole());
+        assertEquals(ARYA, response.getUser().getCollege());
         verify(teacherProfileRepository).save(any(TeacherProfile.class));
     }
 
@@ -133,6 +188,7 @@ class AuthServiceTest {
     void testRegisterDuplicateEmailThrowsBadRequest() {
         RegisterRequest request = new RegisterRequest();
         request.setRole(Role.STUDENT);
+        request.setCollege(ARYA);
         request.setEmail("duplicate@example.com");
 
         when(userRepository.existsByEmail("duplicate@example.com")).thenReturn(true);
@@ -169,6 +225,7 @@ class AuthServiceTest {
         RegisterRequest request = new RegisterRequest();
         request.setEmail("student@example.com");
         request.setRole(Role.STUDENT);
+        request.setCollege(ARYA);
         request.setEnrollmentNo("EN_DUP");
 
         when(userRepository.existsByEmail("student@example.com")).thenReturn(false);
@@ -182,6 +239,7 @@ class AuthServiceTest {
         RegisterRequest request = new RegisterRequest();
         request.setEmail("teacher@example.com");
         request.setRole(Role.TEACHER);
+        request.setCollege(ARYA);
         request.setEmployeeId("EMP_DUP");
 
         when(userRepository.existsByEmail("teacher@example.com")).thenReturn(false);

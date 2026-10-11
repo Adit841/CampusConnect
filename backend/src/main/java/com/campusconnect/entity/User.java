@@ -34,6 +34,8 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    private String college;
+
     @Column(name = "profile_image")
     private String profileImage;
 
@@ -108,6 +110,14 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public String getCollege() {
+        return college;
+    }
+
+    public void setCollege(String college) {
+        this.college = college;
     }
 
     public String getProfileImage() {

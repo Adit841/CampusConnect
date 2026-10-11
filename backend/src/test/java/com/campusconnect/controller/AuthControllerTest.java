@@ -58,6 +58,7 @@ class AuthControllerTest {
                 "email": "student@test.com",
                 "password": "password123",
                 "role": "STUDENT",
+                "college": "Arya College of Engineering & IT",
                 "enrollmentNo": "EN001"
             }
         """;
@@ -85,6 +86,25 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidPayload))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testRegisterWithoutCollegeFailsValidation() throws Exception {
+        String payload = """
+            {
+                "name": "Student",
+                "email": "student@test.com",
+                "password": "password123",
+                "role": "STUDENT",
+                "enrollmentNo": "EN001"
+            }
+        """;
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors.college").value("College is required"));
     }
 
     @Test
@@ -122,6 +142,7 @@ class AuthControllerTest {
                 "email": "student@test.com",
                 "password": "password123",
                 "role": "STUDENT",
+                "college": "Arya College of Engineering & IT",
                 "enrollmentNo": "EN001"
             }
         """;

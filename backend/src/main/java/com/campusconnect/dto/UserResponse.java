@@ -11,6 +11,7 @@ public class UserResponse {
     private String name;
     private String email;
     private Role role;
+    private String college;
     private String profileImage;
     private String phone;
     private String bio;
@@ -36,7 +37,7 @@ public class UserResponse {
         if (user == null) {
             return null;
         }
-        return new UserResponse(
+        UserResponse response = new UserResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
@@ -47,6 +48,16 @@ public class UserResponse {
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );
+        response.setCollege(user.getCollege());
+        return response;
+    }
+
+    public String getCollege() {
+        return college;
+    }
+
+    public void setCollege(String college) {
+        this.college = college;
     }
 
     public Long getId() {
