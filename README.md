@@ -1,5 +1,7 @@
 # CampusConnect
 
+**Live demo:** [campusconnect-z5v6.onrender.com](https://campusconnect-z5v6.onrender.com/)
+
 **One place for campus life.** CampusConnect is a full-stack college web app that brings
 students, teachers, and admins together: classes and assignments, announcements, clubs and
 events, a campus community board, and real-time private chat.
