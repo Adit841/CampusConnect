@@ -326,6 +326,8 @@ Detailed contracts for individual modules:
 | Aayushman Pathak(24EARCS003) | Chat,presence, Community & Feedback hub, Clubs & Events module |
 | Akshat Verma(24EARCS015) | Academics: subjects, assignments, and submissions |
 
+**PBL Team ID:** `PBL2627-CSE-A-019`
+
 Individual reports for each member are in [`docs/reports/`](docs/reports/).
 
 ---
