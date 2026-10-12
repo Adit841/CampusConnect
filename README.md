@@ -318,11 +318,11 @@ Detailed contracts for individual modules:
 
 | Member | Main contribution |
 |---|---|
-| Aditya Gour | Project setup, landing page, role-based dashboard, academics page, security and performance fixes, college registration flow, Docker deployment |
-| Aman Kumar Chauhan | Authentication, user profiles, shared database and deployment settings, UML diagrams, SRS |
-| Anjali Kumari | Announcements module |
-| Aayushman Pathak | Chat, presence, Community & Feedback hub, Clubs & Events module |
-| Akshat Verma | Academics: subjects, assignments, and submissions |
+| Aditya Gour(24EARCS008) | Project setup, landing page, role-based dashboard, academics page, security and performance fixes, college registration flow, Docker deployment |
+| Aman Kumar Chauhan(24EARCS017) | Authentication, user profiles, shared database and deployment settings, UML diagrams, SRS |
+| Anjali Kumari(24EARCS020) | Announcements module |
+| Aayushman Pathak(24EARCS003) | Chat, presence, Community & Feedback hub, Clubs & Events module |
+| Akshat Verma(24EARCS015) | Academics: subjects, assignments, and submissions |
 
 Individual reports for each member are in [`docs/reports/`](docs/reports/).
 
