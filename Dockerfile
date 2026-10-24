@@ -20,6 +20,8 @@ RUN mvn -B -q dependency:go-offline
 
 COPY backend/src ./src
 COPY --from=frontend /frontend/dist ./src/main/resources/static
+# Keep the Maven heap down so Render's Docker build does not get OOM-killed.
+ENV MAVEN_OPTS="-Xmx768m"
 RUN mvn -B -q package -DskipTests
 
 # ---- Run ----
