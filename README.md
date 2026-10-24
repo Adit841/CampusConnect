@@ -1,5 +1,7 @@
 # CampusConnect
 
+The live site can take a minute or two to open on the first visit while the server wakes up.
+
 **Live demo:** [campusconnect-z5v6.onrender.com](https://campusconnect-z5v6.onrender.com/)
 
 **One place for campus life.** CampusConnect is a full-stack college web app that brings
