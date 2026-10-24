@@ -4,6 +4,8 @@ The live site can take a minute or two to open on the first visit while the serv
 
 **Live demo:** [campusconnect-z5v6.onrender.com](https://campusconnect-z5v6.onrender.com/)
 
+**Demo logins** (student and teacher): see [`docs/demo-accounts.md`](docs/demo-accounts.md).
+
 **One place for campus life.** CampusConnect is a full-stack college web app that brings
 students, teachers, and admins together: classes and assignments, announcements, clubs and
 events, a campus community board, and real-time private chat.
@@ -308,6 +310,7 @@ Detailed contracts for individual modules:
 
 | Document | Location |
 |---|---|
+| Demo student and teacher logins | [`docs/demo-accounts.md`](docs/demo-accounts.md) |
 | Architecture and coding conventions | [`docs/architecture.md`](docs/architecture.md) |
 | Dashboard and frontend shell | [`docs/dashboard.md`](docs/dashboard.md) |
 | Chat module | [`docs/chat-module.md`](docs/chat-module.md) |
